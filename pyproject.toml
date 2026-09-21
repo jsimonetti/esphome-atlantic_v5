@@ -1,0 +1,6 @@
+[project]
+name = "atlantic-v5"
+version = "0.1.0"
+description = "ESPHome external component for the Atlantic V5 DHW heat pump bus"
+requires-python = ">=3.12,<3.13"
+dependencies = ["esphome"]

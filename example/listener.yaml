@@ -1,0 +1,22 @@
+substitutions:
+  board: esp32dev
+
+esphome:
+  name: atlantic-v5-listener
+
+esp32:
+  board: ${board}
+  framework:
+    type: esp-idf
+
+logger:
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+# M0 skeleton: mode selection only, no entities yet (see implementation plan, M0).
+atlantic_v5:
+  id: dhw
+  mode: listener
