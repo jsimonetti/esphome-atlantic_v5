@@ -16,7 +16,6 @@ external_components:
       type: local
       path: ../components
 
-# M0.5: mode selection + bus_capture harvesting (3.5.5). Entities land at M4.
 atlantic_v5:
   id: dhw
   mode: listener

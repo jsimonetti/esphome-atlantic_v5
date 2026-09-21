@@ -34,7 +34,11 @@ SIDE_SCHEMA = cv.Schema(
 
 
 def _validate_sides(config):
-    if config[CONF_MODE] == MODES[MODE_MITM]:
+    # config[CONF_MODE] is the raw string key (cv.enum keeps the enum value
+    # separately as .enum_value); comparing against MODES[...] compares a str
+    # to a codegen MockObj, whose __eq__ builds a C++ expression that is
+    # always truthy, so this branch would fire unconditionally.
+    if config[CONF_MODE] == MODE_MITM:
         # MITM transport (3.5, 3.6) isn't built yet; don't accept a config that
         # would silently do nothing.
         raise cv.Invalid("mode: mitm is not implemented yet (lands at M6); use mode: listener")
