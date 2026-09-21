@@ -1,0 +1,16 @@
+wiki/
+.claude/settings.local.json
+.scratch
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+
+# ESPHome build output
+.esphome/
+
+# CMake host test build output
+test/host/build/
