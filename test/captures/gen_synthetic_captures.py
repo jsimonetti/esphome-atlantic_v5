@@ -2,7 +2,7 @@
 """Generates the synthetic_*.csv seed captures for ticket 01.
 
 Frame bytes are derived from the worked examples and message catalogue in
-Part 2 of atlantic_v5_component_implementation_plan.md. Every CRC is computed
+Part 2 of docs/atlantic-v5-plan.md. Every CRC is computed
 by two independent CRC-16/MODBUS implementations (reflected bit-shift vs.
 byte-reflected MSB-first) and cross-checked before being written out, so
 nothing here is eyeballed.
