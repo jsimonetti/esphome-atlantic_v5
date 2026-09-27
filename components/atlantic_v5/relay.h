@@ -4,9 +4,9 @@
 #pragma once
 
 #include "bus_io.h"
-#include "core/assembler.h"
-#include "core/relay_policy.h"
-#include "core/types.h"
+#include "assembler.h"
+#include "relay_policy.h"
+#include "types.h"
 
 namespace atlantic_v5 {
 

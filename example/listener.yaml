@@ -1,5 +1,5 @@
 substitutions:
-  board: esp32dev
+  board: arduino_nano_esp32
 
 esphome:
   name: atlantic-v5-listener
@@ -20,6 +20,50 @@ atlantic_v5:
   id: dhw
   mode: listener
   bus_capture: true
+  timeout: 60s
   hmi:
     uart_num: 1
     rx_pin: GPIO7
+
+sensor:
+  - platform: atlantic_v5
+    water_temperature:
+      name: DHW water temperature
+    compressor_outlet_temperature:
+      name: DHW compressor outlet temperature
+    air_inlet_temperature:
+      name: DHW air inlet temperature
+    evaporator_1_temperature:
+      name: DHW evaporator 1 temperature
+    evaporator_2_temperature:
+      name: DHW evaporator 2 temperature
+    evaporator_3_temperature:
+      name: DHW evaporator 3 temperature
+    setpoint:
+      name: DHW setpoint
+    water_temperature_min:
+      name: DHW water temperature min
+    water_temperature_max:
+      name: DHW water temperature max
+    cycle_1_count:
+      name: DHW cycle 1 count
+
+binary_sensor:
+  - platform: atlantic_v5
+    heating_active:
+      name: DHW heating
+    input_i1:
+      name: DHW input I1
+    input_i2:
+      name: DHW input I2
+    cycle_1_active:
+      name: DHW cycle 1 active
+
+text_sensor:
+  - platform: atlantic_v5
+    firmware_version:
+      name: DHW firmware version
+    serial_number:
+      name: DHW serial number
+    hmi_version:
+      name: DHW HMI version

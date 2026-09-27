@@ -1,13 +1,23 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
-from esphome.const import CONF_ID, CONF_MODE, CONF_RX_PIN, CONF_TX_PIN
+from esphome.const import CONF_ID, CONF_MODE, CONF_RX_PIN, CONF_TIMEOUT, CONF_TX_PIN
 
 CODEOWNERS = ["@jsimonetti"]
 
-atlantic_v5_ns = cg.esphome_ns.namespace("atlantic_v5")
+# Named "atlantic_v5_component", not "atlantic_v5": ESPHome's generated
+# main.cpp does `using namespace esphome;`, so any *unqualified* reference to
+# an esphome::atlantic_v5::* symbol would be ambiguous with the L1/L2 core's
+# own global `namespace atlantic_v5 { ... }` (core/transport headers this
+# component #includes) - ESPHome's own codegen never fully-qualifies with
+# `esphome::`, so this collision isn't avoidable by qualifying our own calls
+# alone. See build-and-tooling notes.
+atlantic_v5_ns = cg.esphome_ns.namespace("atlantic_v5_component")
 AtlanticV5Component = atlantic_v5_ns.class_("AtlanticV5Component", cg.Component)
 Mode = atlantic_v5_ns.enum("Mode", is_class=True)
+# Shared with sensor.py/binary_sensor.py/text_sensor.py: which publish_state()
+# overload set_entity() should dispatch to (plan 3.7.1/3.7.3).
+EntityKind = atlantic_v5_ns.enum("EntityKind", is_class=True)
 
 MODE_LISTENER = "listener"
 MODE_MITM = "mitm"
@@ -20,6 +30,9 @@ CONF_HMI = "hmi"
 CONF_MAIN = "main"
 CONF_UART_NUM = "uart_num"
 CONF_BUS_CAPTURE = "bus_capture"
+# Referenced by the read-only-entity platform files (sensor.py etc.) to look up
+# this hub instance (plan 3.7.3's "cv.GenerateID(CONF_atlantic_v5_ID)").
+CONF_ATLANTIC_V5_ID = "atlantic_v5_id"
 
 # M0.5: only the pins actually consumed by listener-mode bus_capture (3.5.5).
 # tx_enable_pin / one_wire_mirror are not accepted yet: they land with M6, once
@@ -55,6 +68,10 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(AtlanticV5Component),
             cv.Optional(CONF_MODE, default=MODE_LISTENER): cv.enum(MODES, lower=True),
             cv.Optional(CONF_BUS_CAPTURE, default=False): cv.boolean,
+            # Plan 3.7.1: "If no valid frame has been seen for timeout (default
+            # 60s), publish NAN ... and mark the component failed", gated on
+            # MAIN specifically (ticket 07), not on HMI traffic.
+            cv.Optional(CONF_TIMEOUT, default="60s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_HMI): SIDE_SCHEMA,
             cv.Optional(CONF_MAIN): SIDE_SCHEMA,
         }
@@ -68,6 +85,7 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_mode(config[CONF_MODE]))
     cg.add(var.set_bus_capture(config[CONF_BUS_CAPTURE]))
+    cg.add(var.set_timeout(config[CONF_TIMEOUT]))
 
     side = config.get(CONF_HMI, config.get(CONF_MAIN))
     cg.add(var.set_uart_num(side[CONF_UART_NUM]))

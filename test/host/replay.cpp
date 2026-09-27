@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "core/types.h"
+#include "types.h"
 #include "replay_lib.h"
 
 namespace {

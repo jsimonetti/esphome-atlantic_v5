@@ -4,10 +4,10 @@
 #include <fstream>
 #include <sstream>
 
-#include "core/assembler.h"
-#include "core/catalog.h"
-#include "core/decoder.h"
-#include "core/frame.h"
+#include "assembler.h"
+#include "catalog.h"
+#include "decoder.h"
+#include "frame.h"
 
 namespace replay {
 

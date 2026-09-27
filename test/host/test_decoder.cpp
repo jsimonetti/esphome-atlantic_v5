@@ -8,12 +8,12 @@
 #include <string>
 #include <vector>
 
-#include "core/assembler.h"
-#include "core/catalog.h"
-#include "core/crc16.h"
-#include "core/decoder.h"
-#include "core/frame.h"
-#include "core/types.h"
+#include "assembler.h"
+#include "catalog.h"
+#include "crc16.h"
+#include "decoder.h"
+#include "frame.h"
+#include "types.h"
 #include "test_harness.h"
 
 #ifndef CAPTURES_DIR

@@ -7,22 +7,29 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 enable_testing()
 
-# core/ is host-compilable by design (implementation plan, architecture rules):
-# no esp-idf, no ESPHome, no Arduino headers, no heap in runtime paths.
+# core/ (L1) and transport/ (L2) used to be subfolders of components/atlantic_v5/,
+# but ESPHome's external-component loader only copies .cpp/.h files that are
+# direct children of a component's package directory (it silently drops nested
+# non-package subdirectories) - see build-and-tooling notes. Both layers now
+# live flat in components/atlantic_v5/ alongside atlantic_v5.cpp/.h; the two
+# CMake library targets below are still split to keep the L1/L2 dependency
+# direction explicit.
 add_library(atlantic_v5_core
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/crc16.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/frame.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/assembler.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/catalog.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/decoder.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/relay_policy.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/crc16.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/frame.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/assembler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/catalog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/decoder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay_policy.cpp)
 target_include_directories(atlantic_v5_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5)
 
-# transport/ is L2: hardware-free pieces (Relay, plan M5) are host-compilable
-# against the abstract BusIo; only uart_bus_io.cpp (M6) will need esp-idf.
+# L2: hardware-free pieces (Relay plan M5, Listener plan M4) are host-compilable
+# against the abstract BusIo / core alone; only uart_bus_io.cpp (M6) will need
+# esp-idf.
 add_library(atlantic_v5_transport
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/transport/relay.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/listener.cpp)
 target_link_libraries(atlantic_v5_transport PUBLIC atlantic_v5_core)
 
 # Shared behind the replay CLI (Appendix A) and test_replay_golden, so the test
@@ -70,3 +77,10 @@ target_include_directories(test_relay PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(test_relay PRIVATE
     CAPTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../captures")
 add_test(NAME test_relay COMMAND test_relay)
+
+add_executable(test_listener test_listener.cpp)
+target_link_libraries(test_listener PRIVATE atlantic_v5_transport)
+target_include_directories(test_listener PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_listener PRIVATE
+    CAPTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../captures")
+add_test(NAME test_listener COMMAND test_listener)

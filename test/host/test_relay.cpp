@@ -9,12 +9,12 @@
 #include <string>
 #include <vector>
 
-#include "core/crc16.h"
-#include "core/relay_policy.h"
-#include "core/types.h"
+#include "bus_io.h"
+#include "crc16.h"
+#include "relay.h"
+#include "relay_policy.h"
 #include "test_harness.h"
-#include "transport/bus_io.h"
-#include "transport/relay.h"
+#include "types.h"
 
 #ifndef CAPTURES_DIR
 #define CAPTURES_DIR "test/captures"

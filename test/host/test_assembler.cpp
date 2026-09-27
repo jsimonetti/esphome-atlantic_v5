@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "core/assembler.h"
-#include "core/frame.h"
-#include "core/types.h"
+#include "assembler.h"
+#include "frame.h"
+#include "types.h"
 #include "test_harness.h"
 
 #ifndef CAPTURES_DIR
