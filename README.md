@@ -237,10 +237,24 @@ text_sensor:
     last_frame_dump: {name: DHW last frame dump}          # see raw_frame_dump below
     self_test_result: {name: DHW self-test result}        # mitm-only
 
+binary_sensor:
+  - platform: atlantic_v5
+    connected: {name: DHW connected}
+
 switch:
   - platform: atlantic_v5
     raw_frame_dump: {name: DHW raw frame dump}
 ```
+
+`connected` reports whether the appliance is still talking, in both modes. It
+reads off until the first valid frame arrives, on while frames keep coming,
+and off again once the bus has been quiet for longer than `timeout` (the
+`atlantic_v5:` option, default `60s`) — the same moment the component raises
+its "no data from MAIN" status warning and republishes every numeric sensor as
+unknown. Quiet means quiet *from MAIN specifically*: a chatty HMI talking to a
+dead controller still reads off. It is the one entity to bind an automation or
+an availability template to; the warning and the wall of unknowns are the same
+fact in a form only a human can read.
 
 `frames_ok`/`crc_errors`/`resyncs`/`dropped_bytes` are per-side totals in
 `mitm` mode (HMI + MAIN assemblers summed) and single-assembler totals in

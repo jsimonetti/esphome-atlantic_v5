@@ -174,8 +174,10 @@ void AtlanticV5Component::loop_mitm() {
     ::atlantic_v5::Frame f(ev.channel, ev.data, ev.len);
     // Transaction-byte rule (plan 2.2): only MAIN's payload-bearing response
     // resets the staleness gate, matching ticket 07's listener-mode semantics.
-    if (ev.channel == ::atlantic_v5::Channel::MAIN && f.has_payload())
+    if (ev.channel == ::atlantic_v5::Channel::MAIN && f.has_payload()) {
       this->last_main_us_ = ev.t_us;
+      this->seen_main_ = true;
+    }
     // Dump before restoring: raw_frame_dump exists to show what went out on the
     // wire, which is the rewritten frame.
     this->maybe_dump_frame(f, ev.t_us);
@@ -367,7 +369,18 @@ void AtlanticV5Component::publish(const ::atlantic_v5::DecodedValue &v) {
 }
 
 void AtlanticV5Component::update_staleness(uint32_t now_us) {
-  bool is_stale = this->us_since_main(now_us) >= this->timeout_us_;
+  // The one place that decides "stale" (ticket 16): the NAN publish, the
+  // component warning and the `connected` entity are three presentations of
+  // this single result, never three clocks.
+  bool is_stale = !this->has_main() || this->us_since_main(now_us) >= this->timeout_us_;
+
+  // Published unconditionally rather than only on a transition: the first tick
+  // has to establish the initial state, and binary_sensor::publish_state()
+  // dedupes by value itself.
+  void *connected = this->entities_[::atlantic_v5::ENT_CONNECTED];
+  if (connected != nullptr && this->kinds_[::atlantic_v5::ENT_CONNECTED] == EntityKind::BINARY_SENSOR)
+    static_cast<binary_sensor::BinarySensor *>(connected)->publish_state(!is_stale);
+
   if (is_stale == this->stale_)
     return;
   this->stale_ = is_stale;
@@ -392,6 +405,14 @@ uint32_t AtlanticV5Component::us_since_main(uint32_t now_us) const {
     return now_us - this->last_main_us_;
 #endif
   return this->listener_.us_since_main(now_us);
+}
+
+bool AtlanticV5Component::has_main() const {
+#ifdef USE_ESP32
+  if (this->mode_ == Mode::MITM)
+    return this->seen_main_;
+#endif
+  return this->listener_.has_main();
 }
 
 void AtlanticV5Component::dump_config() {

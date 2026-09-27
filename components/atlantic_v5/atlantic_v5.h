@@ -80,6 +80,9 @@ class AtlanticV5Component : public Component {
   void publish(const ::atlantic_v5::DecodedValue &v);
   void update_staleness(uint32_t now_us);
   uint32_t us_since_main(uint32_t now_us) const;
+  // Whether a payload-bearing MAIN frame has been seen at all since boot. Until
+  // one has, us_since_main() is just "microseconds since boot" and says nothing.
+  bool has_main() const;
 
 #ifdef USE_ESP32
   // M0.5: minimal listener-mode UART bring-up feeding bus_capture (3.5.5).
@@ -125,6 +128,7 @@ class AtlanticV5Component : public Component {
   // assembler this path doesn't need).
   ::atlantic_v5::Decoder decoder_;
   uint32_t last_main_us_{0};
+  bool seen_main_{false};
 
   BusCaptureLogger *hmi_capture_logger_{nullptr};
   BusCaptureLogger *main_capture_logger_{nullptr};

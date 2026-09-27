@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 from esphome.components import binary_sensor
 import esphome.config_validation as cv
-from esphome.const import ENTITY_CATEGORY_DIAGNOSTIC
+from esphome.const import DEVICE_CLASS_CONNECTIVITY, ENTITY_CATEGORY_DIAGNOSTIC
 
 from . import CONF_ATLANTIC_V5_ID, AtlanticV5Component, EntityKind
 
@@ -26,6 +26,14 @@ BINARY_SENSORS = {
     "cycle_4_active": ("ENT_CYCLE_4_ACTIVE", _diagnostic_schema()),
     "cycle_5_active": ("ENT_CYCLE_5_ACTIVE", _diagnostic_schema()),
     "cycle_6_active": ("ENT_CYCLE_6_ACTIVE", _diagnostic_schema()),
+    # Not decoded from a frame: the staleness gate's own state (ticket 16).
+    "connected": (
+        "ENT_CONNECTED",
+        binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_CONNECTIVITY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+    ),
 }
 
 CONFIG_SCHEMA = cv.Schema(

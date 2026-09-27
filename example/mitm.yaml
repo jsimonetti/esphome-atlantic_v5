@@ -112,6 +112,8 @@ sensor:
 
 binary_sensor:
   - platform: atlantic_v5
+    connected:
+      name: DHW connected
     heating_active:
       name: DHW heating
     input_i1:

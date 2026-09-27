@@ -151,5 +151,38 @@ int main() {
     CHECK(seen.empty());
   }
 
+  // --- has_main() distinguishes "never heard from MAIN" from "heard from MAIN
+  // at t=0" (ticket 16: the `connected` entity must read off until a frame has
+  // actually been seen, which us_since_main() alone cannot express). ---
+  {
+    Listener l;
+    CHECK(!l.has_main());
+
+    // HMI-origin write frame: decodes, but is not MAIN traffic.
+    std::vector<uint8_t> header = {0x01, 0x65, 0x00, 0x03, 0x01, 17};
+    std::vector<uint8_t> text = {'3', '.', '1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    header.insert(header.end(), text.begin(), text.end());
+    feed(l, build_frame(header), 1'000'000);
+    CHECK(!l.has_main());
+
+    // Bad CRC is fail-safe discarded, so it must not count either.
+    auto bad = build_frame({0x01, 0x64, 0x14, 0xB7, 0x01, 0x02, 0x11, 0xC6});
+    bad[bad.size() - 1] ^= 0xFF;
+    feed(l, bad, 2'000'000);
+    CHECK(!l.has_main());
+
+    feed(l, build_frame({0x01, 0x64, 0x14, 0xB7, 0x01, 0x02, 0x11, 0xC6}), 3'000'000);
+    CHECK(l.has_main());
+  }
+
+  // --- A MAIN frame arriving at t_us == 0 still counts as seen; has_main()
+  // must not be inferred from last_main_us_ being non-zero. ---
+  {
+    Listener l;
+    feed(l, build_frame({0x01, 0x64, 0x14, 0xB7, 0x01, 0x02, 0x11, 0xC6}), 0);
+    CHECK(l.has_main());
+    CHECK(l.us_since_main(0) == 0);
+  }
+
   TEST_MAIN_RETURN();
 }

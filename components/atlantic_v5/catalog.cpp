@@ -59,6 +59,7 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "last_unknown_frame",
     "last_frame_dump",
     "self_test_result",
+    "connected",
 };
 }  // namespace
 

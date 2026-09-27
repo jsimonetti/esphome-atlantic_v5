@@ -48,6 +48,11 @@ class Listener {
   // own configured timeout; HMI-only traffic never resets it (ticket 07).
   uint32_t us_since_main(uint32_t t_us) const { return t_us - last_main_us_; }
 
+  // Whether any such frame has been seen at all. us_since_main() can't say:
+  // before the first frame it just counts up from t=0, which is
+  // indistinguishable from a frame that genuinely arrived at t=0.
+  bool has_main() const { return has_main_; }
+
   const FrameAssembler::Stats &assembler_stats() const { return assembler_.stats(); }
   const Decoder::Stats &decoder_stats() const { return decoder_.stats(); }
 
@@ -57,6 +62,7 @@ class Listener {
   FrameAssembler assembler_{Channel::BUS, false};
   Decoder decoder_;
   uint32_t last_main_us_ = 0;
+  bool has_main_ = false;
   Sink sink_ = nullptr;
   void *ctx_ = nullptr;
   FrameSink frame_sink_ = nullptr;

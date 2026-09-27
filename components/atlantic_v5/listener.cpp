@@ -23,8 +23,10 @@ void Listener::handle_frame(uint32_t t_us) {
   Frame f(Channel::BUS, assembler_.frame(), assembler_.frame_len());
   if (!f.crc_valid())
     return;
-  if (f.has_payload() && (f.header_key() & TXN_MASK) == TXN_READ)
+  if (f.has_payload() && (f.header_key() & TXN_MASK) == TXN_READ) {
     last_main_us_ = t_us;
+    has_main_ = true;
+  }
   if (frame_sink_ != nullptr)
     frame_sink_(frame_ctx_, f, t_us);
   if (sink_ != nullptr)
