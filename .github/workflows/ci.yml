@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# A push to a branch that also has an open PR fires both events. Keying the
+# group on the branch name (rather than github.ref, which differs between the
+# two) makes them collapse into one run instead of two full ESP-IDF builds.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host tests (ctest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # No -G: the default generator (Unix Makefiles) is what the dev machine
+      # uses, and ubuntu-latest defaults to the same. Forcing -G Ninja here
+      # would let the CMakeLists drift into something that no longer configures
+      # locally.
+      - name: Configure
+        run: cmake -S test/host -B test/host/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build test/host/build --parallel
+
+      # --no-tests=error: bare ctest exits 0 when nothing is registered, so a
+      # botched add_test would report green having run nothing.
+      - name: Test
+        run: ctest --test-dir test/host/build --output-on-failure --no-tests=error
+
+  esphome-compile:
+    name: ESPHome compile (both examples)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # pyproject pins requires-python >=3.12,<3.13 because esphome 2026.9.0
+      # does not support 3.14, which is uv's default on a fresh machine.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Read esphome version
+        id: esphome
+        run: |
+          version="$(uv run esphome version | awk '{print $NF}')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # The ESP-IDF toolchain download dominates this job's wall-clock time, so
+      # it is cached, keyed on the resolved esphome version (which pins the IDF
+      # and platform versions transitively).
+      #
+      # Deliberately NOT cached: example/.esphome/. It holds the IDF build tree,
+      # into which ESPHome *copies* the component sources. Restoring it across
+      # commits risks a file deleted in the repo lingering in the copied tree and
+      # still linking, which is exactly the class of failure this job exists to
+      # catch. A full IDF build from a warm toolchain cache is cheap enough that
+      # the trade is not worth it.
+      #
+      # restore-keys is set so an esphome version bump warm-starts from the
+      # previous toolchain rather than re-downloading everything; PlatformIO
+      # adds packages to the tree rather than replacing it. ~/.platformio is the
+      # only path worth listing - esphome under esp-idf puts everything there.
+      - name: Cache ESP-IDF toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: esp-idf-${{ runner.os }}-esphome-${{ steps.esphome.outputs.version }}
+          restore-keys: esp-idf-${{ runner.os }}-esphome-
+
+      # Both configs are compiled with their own `board:` substitution default.
+      # Both are needed, not one: listener.yaml has no `select:` block and
+      # mitm.yaml does, and a missing `#ifdef USE_<PLATFORM>` guard only fails -
+      # at the final link step, not at compile - in the config that does not use
+      # the platform.
+      #
+      # No `esphome clean` between them: ESPHome keys its build directory on the
+      # config `name`, and these two differ (atlantic-v5-listener /
+      # atlantic-v5-mitm), so they never share a build tree. Giving them the
+      # same name would reintroduce the IDF_TARGET mismatch.
+      - name: Compile example/listener.yaml
+        run: uv run esphome compile example/listener.yaml
+
+      # !cancelled(): report both configs in one run rather than hiding mitm's
+      # result behind a listener failure, while still stopping on a cancelled
+      # run (always() would start a full IDF build after cancellation).
+      - name: Compile example/mitm.yaml
+        if: '!cancelled()'
+        run: uv run esphome compile example/mitm.yaml
