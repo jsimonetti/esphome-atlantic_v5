@@ -9,9 +9,17 @@ enable_testing()
 
 # core/ is host-compilable by design (implementation plan, architecture rules):
 # no esp-idf, no ESPHome, no Arduino headers, no heap in runtime paths.
-add_library(atlantic_v5_core INTERFACE)
-target_include_directories(atlantic_v5_core INTERFACE
+add_library(atlantic_v5_core
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/crc16.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/core/frame.cpp)
+target_include_directories(atlantic_v5_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5)
 
 # Test binaries are added here as each milestone's core/ files land:
 # test_crc (M1), test_assembler (M2), test_decoder (M3), test_relay (M5).
+add_executable(test_crc test_crc.cpp)
+target_link_libraries(test_crc PRIVATE atlantic_v5_core)
+target_include_directories(test_crc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(test_crc PRIVATE
+    CAPTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../captures")
+add_test(NAME test_crc COMMAND test_crc)
