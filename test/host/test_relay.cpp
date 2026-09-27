@@ -11,6 +11,7 @@
 
 #include "bus_io.h"
 #include "crc16.h"
+#include "frame.h"
 #include "relay.h"
 #include "relay_policy.h"
 #include "test_harness.h"
@@ -24,6 +25,7 @@ namespace {
 
 using atlantic_v5::BusIo;
 using atlantic_v5::Channel;
+using atlantic_v5::Frame;
 using atlantic_v5::Relay;
 using atlantic_v5::RelayPolicy;
 
@@ -263,6 +265,101 @@ int main() {
     CHECK(relay.stats().frames_relayed == 1);  // unchanged: the echo was not relayed
     CHECK(main_io.writes_.size() == 1);
     CHECK(hmi_io.writes_.empty());
+  }
+
+  // --- Raw capture piggyback (plan 3.5.5 MITM piggyback): the capture sink sees
+  // every chunk read from either side, tagged with the correct channel, including
+  // the echoed chunk that echo accounting discards from framing. ---
+  {
+    auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
+
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;
+    Relay relay(hmi_io, main_io, policy);
+
+    struct Captured {
+      Channel channel;
+      std::vector<uint8_t> bytes;
+    };
+    std::vector<Captured> captured;
+    relay.set_capture_sink(
+        [](void *ctx, Channel channel, const uint8_t *data, size_t len, uint32_t /*t_us*/) {
+          auto *out = static_cast<std::vector<Captured> *>(ctx);
+          out->push_back({channel, std::vector<uint8_t>(data, data + len)});
+        },
+        &captured);
+
+    for (const auto &row : rows) {
+      (row.channel == Channel::HMI ? hmi_io : main_io).queue(row.t_us, row.bytes);
+      hmi_io.set_now(row.t_us);
+      main_io.set_now(row.t_us);
+      relay.poll(row.t_us);
+    }
+
+    CHECK(captured.size() == rows.size());
+    for (size_t i = 0; i < rows.size(); i++) {
+      CHECK(captured[i].channel == rows[i].channel);
+      CHECK(captured[i].bytes == rows[i].bytes);
+    }
+  }
+
+  // --- Cross-thread handoff (plan 3.6.5): the frame sink sees every completed
+  // frame, tagged with its origin channel and reflecting any rewrite, and always
+  // fires strictly after the corresponding write to the opposite side ("forward
+  // first, enqueue second", plan 3.9 #1). ---
+  {
+    auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
+
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;
+    policy.set_control_mode(atlantic_v5::ControlMode::BOOST);
+    Relay relay(hmi_io, main_io, policy);
+
+    struct Event {
+      Channel channel;
+      std::vector<uint8_t> bytes;
+      size_t writes_so_far;
+    };
+    std::vector<Event> events;
+    struct Ctx {
+      std::vector<Event> *events;
+      MockBusIo *hmi_io;
+      MockBusIo *main_io;
+    } ctx{&events, &hmi_io, &main_io};
+    relay.set_frame_sink(
+        [](void *raw_ctx, Channel channel, const Frame &f, uint32_t /*t_us*/) {
+          auto *c = static_cast<Ctx *>(raw_ctx);
+          size_t writes = c->hmi_io->writes_.size() + c->main_io->writes_.size();
+          c->events->push_back({channel, std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()), writes});
+        },
+        &ctx);
+
+    for (const auto &row : rows) {
+      (row.channel == Channel::HMI ? hmi_io : main_io).queue(row.t_us, row.bytes);
+      hmi_io.set_now(row.t_us);
+      main_io.set_now(row.t_us);
+      relay.poll(row.t_us);
+    }
+
+    CHECK(events.size() == rows.size());
+    for (size_t i = 0; i < rows.size(); i++) {
+      // The write to the opposite side already happened by the time the sink runs.
+      CHECK(events[i].writes_so_far == i + 1);
+      CHECK(events[i].channel == rows[i].channel);
+    }
+    // The BOOST-rewritten control frame's event carries the rewritten bytes, not
+    // the original ones. The header 0164FF1403 also appears as HMI's payload-less
+    // (7-byte) poll request, which RelayPolicy never touches (payload_len() != 3)
+    // — only the payload-bearing (11-byte) MAIN response is rewritten.
+    bool found_rewritten_event = false;
+    for (size_t i = 0; i < rows.size(); i++) {
+      if (rows[i].bytes.size() > 7 && rows[i].bytes[0] == 0x01 && rows[i].bytes[1] == 0x64 &&
+          rows[i].bytes[2] == 0xFF && rows[i].bytes[3] == 0x14 && rows[i].bytes[4] == 0x03) {
+        CHECK(events[i].bytes != rows[i].bytes);
+        found_rewritten_event = true;
+      }
+    }
+    CHECK(found_rewritten_event);
   }
 
   TEST_MAIN_RETURN();

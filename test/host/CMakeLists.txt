@@ -25,8 +25,9 @@ target_include_directories(atlantic_v5_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5)
 
 # L2: hardware-free pieces (Relay plan M5, Listener plan M4) are host-compilable
-# against the abstract BusIo / core alone; only uart_bus_io.cpp (M6) will need
-# esp-idf.
+# against the abstract BusIo / core alone; uart_bus_io.cpp/relay_task.cpp
+# (M6) and bus_capture_logger.cpp (ESP32-only logging) need esp-idf and are
+# deliberately never added here.
 add_library(atlantic_v5_transport
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/listener.cpp)

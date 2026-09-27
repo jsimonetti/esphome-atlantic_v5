@@ -19,6 +19,8 @@ void Relay::service(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   uint8_t buf[MAX_FRAME];
   int n = in.io.read(buf, sizeof(buf), 0);
   if (n > 0) {
+    if (capture_sink_ != nullptr)
+      capture_sink_(capture_ctx_, in_channel, buf, static_cast<size_t>(n), now_us);
     if (now_us < in.echo_until_us) {
       // Our own echo of a write to this side (3.5.3): discard, never frame it.
       stats_.echo_bytes += static_cast<uint32_t>(n);
@@ -49,12 +51,19 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   if (rewritten)
     stats_.rewrites_applied++;
 
-  // Latency here is last-byte-in to write-initiated (plan 3.6.2, excluding fixed
-  // transmit time); this runs synchronously within the same poll() call that
-  // received the last byte, so it is 0 in this hardware-free model. The field is
-  // still plumbed through so a future queued/task-based caller (M6) reports real
-  // numbers through the same stat.
-  uint32_t latency_us = 0;
+  if (frame_sink_ != nullptr)
+    frame_sink_(frame_ctx_, in_channel, f, now_us);
+
+  // Latency here is last-byte-in (now_us, the timestamp the completed frame was
+  // detected at) to write-initiated (plan 3.6.2, excluding fixed transmit time).
+  // out.io.now_us() is read immediately after the write, so in the synchronous
+  // host model (poll() called once per row with a single timestamp for both
+  // sides, MockBusIo's clock never advancing mid-call) this is still exactly 0,
+  // preserving every existing host assertion — but on real hardware (M6's
+  // RelayTask, a real clock) this now reports the actual wakeup+framing+policy
+  // overhead the relay task spent before this write, evidence plan 3.6.2 asks
+  // for instead of a permanently-stubbed 0.
+  uint32_t latency_us = out.io.now_us() - now_us;
   stats_.latency_total_us += latency_us;
   stats_.latency_samples++;
   if (latency_us > stats_.latency_max_us)

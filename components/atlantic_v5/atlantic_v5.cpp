@@ -13,34 +13,35 @@ namespace esphome {
 namespace atlantic_v5_component {
 
 static const char *const TAG = "atlantic_v5";
-static const char *const CAPTURE_TAG = "atlantic_v5.bus_capture";
-
-#ifdef USE_ESP32
-namespace {
-// Plan 2.1/2.5.1: primary framing is length-driven, this is only the backstop.
-constexpr int64_t CAPTURE_SILENCE_US = 4000;
-
-// Uppercase hex, no separators, matching the test/captures/*.csv hex column.
-void to_hex(const uint8_t *data, size_t len, char *out) {
-  static const char DIGITS[] = "0123456789ABCDEF";
-  for (size_t i = 0; i < len; i++) {
-    out[i * 2] = DIGITS[data[i] >> 4];
-    out[i * 2 + 1] = DIGITS[data[i] & 0x0F];
-  }
-  out[len * 2] = '\0';
-}
-}  // namespace
-#endif
 
 void AtlanticV5Component::setup() {
 #ifdef USE_ESP32
-  if (this->mode_ != Mode::LISTENER) {
-    // MITM transport (3.5, 3.6) isn't built yet; Python-side validation
-    // already rejects mode: mitm, this is a defensive backstop.
-    ESP_LOGE(TAG, "mode: mitm is not implemented yet");
-    this->mark_failed();
+  for (float &f : this->last_published_)
+    f = NAN;
+
+  if (this->mode_ == Mode::MITM) {
+    this->setup_mitm();
     return;
   }
+  this->setup_listener();
+#endif
+}
+
+void AtlanticV5Component::loop() {
+#ifdef USE_ESP32
+  if (this->is_failed())
+    return;
+
+  if (this->mode_ == Mode::MITM) {
+    this->loop_mitm();
+    return;
+  }
+  this->loop_listener();
+#endif
+}
+
+#ifdef USE_ESP32
+void AtlanticV5Component::setup_listener() {
   if (this->rx_pin_ < 0) {
     ESP_LOGE(TAG, "listener mode requires rx_pin");
     this->mark_failed();
@@ -64,70 +65,88 @@ void AtlanticV5Component::setup() {
   uart_set_rx_timeout(this->port_, 2);
 
   this->listener_.set_sink(&AtlanticV5Component::publish_trampoline, this);
-  for (float &f : this->last_published_)
-    f = NAN;
-#endif
 }
 
-void AtlanticV5Component::loop() {
-#ifdef USE_ESP32
-  if (this->mode_ != Mode::LISTENER || this->is_failed())
-    return;
-
-  uint8_t chunk[CAPTURE_BUF_LEN];
+void AtlanticV5Component::loop_listener() {
+  uint8_t chunk[32];
   int len = uart_read_bytes(this->port_, chunk, sizeof(chunk), 0);
   int64_t now_us = esp_timer_get_time();
   // Approximates the "last byte received" convention (2.1/3.2): one timestamp
   // for the whole chunk, not per-byte. Good enough at this poll cadence, not
-  // for the sub-millisecond timing MITM will need once the relay task exists.
+  // for the sub-millisecond timing MITM needs (handled by RelayTask instead).
   uint32_t now_us32 = static_cast<uint32_t>(now_us);
 
   if (this->bus_capture_)
-    this->capture_bytes(chunk, static_cast<size_t>(len), now_us);
+    this->capture_logger_.feed(chunk, static_cast<size_t>(len), now_us);
 
   for (int i = 0; i < len; i++)
     this->listener_.push_byte(chunk[i], now_us32);
   this->listener_.tick(now_us32);
   this->update_staleness(now_us32);
-#endif
 }
 
-#ifdef USE_ESP32
-void AtlanticV5Component::capture_bytes(const uint8_t *chunk, size_t len, int64_t now_us) {
-  auto flush = [&](int64_t t_us) {
-    char hex[CAPTURE_BUF_LEN * 2 + 1];
-    to_hex(this->capture_buf_, this->capture_len_, hex);
-    ESP_LOGI(CAPTURE_TAG, "BUSCAP,%lld,bus,%s", static_cast<long long>(t_us), hex);
-    this->capture_len_ = 0;
-  };
+void AtlanticV5Component::set_hmi_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror) {
+  this->hmi_cfg_ = {uart_num, rx_pin, tx_pin, tx_enable_pin, one_wire_mirror};
+}
 
-  // Accumulate rather than logging immediately: frames are variable-length
-  // (5-byte header + optional length-driven payload, plan 2.3), so there's no
-  // fixed size to read in one shot. Only flush early (mid-chunk) if the
-  // buffer would otherwise overflow, so bytes are never dropped.
-  size_t offset = 0;
-  while (offset < len) {
-    if (this->capture_len_ >= sizeof(this->capture_buf_))
-      flush(now_us);
-    size_t space = sizeof(this->capture_buf_) - this->capture_len_;
-    size_t remaining = len - offset;
-    size_t copy_len = remaining < space ? remaining : space;
-    memcpy(this->capture_buf_ + this->capture_len_, chunk + offset, copy_len);
-    this->capture_len_ += copy_len;
-    offset += copy_len;
+void AtlanticV5Component::set_main_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin,
+                                         bool one_wire_mirror) {
+  this->main_cfg_ = {uart_num, rx_pin, tx_pin, tx_enable_pin, one_wire_mirror};
+}
+
+void AtlanticV5Component::capture_sink_trampoline(void *ctx, ::atlantic_v5::Channel channel, const uint8_t *data,
+                                                   size_t len, uint32_t t_us) {
+  auto *self = static_cast<AtlanticV5Component *>(ctx);
+  BusCaptureLogger *logger = channel == ::atlantic_v5::Channel::HMI ? self->hmi_capture_logger_
+                                                                     : self->main_capture_logger_;
+  logger->feed(data, len, static_cast<int64_t>(t_us));
+}
+
+void AtlanticV5Component::setup_mitm() {
+  ::atlantic_v5::UartBusIoConfig hmi_io_cfg{};
+  hmi_io_cfg.port = static_cast<uart_port_t>(this->hmi_cfg_.uart_num);
+  hmi_io_cfg.rx_pin = this->hmi_cfg_.rx_pin;
+  hmi_io_cfg.tx_pin = this->hmi_cfg_.tx_pin;
+  hmi_io_cfg.tx_enable_pin = this->hmi_cfg_.tx_enable_pin;
+  hmi_io_cfg.one_wire_mirror = this->hmi_cfg_.one_wire_mirror;
+
+  ::atlantic_v5::UartBusIoConfig main_io_cfg{};
+  main_io_cfg.port = static_cast<uart_port_t>(this->main_cfg_.uart_num);
+  main_io_cfg.rx_pin = this->main_cfg_.rx_pin;
+  main_io_cfg.tx_pin = this->main_cfg_.tx_pin;
+  main_io_cfg.tx_enable_pin = this->main_cfg_.tx_enable_pin;
+  main_io_cfg.one_wire_mirror = this->main_cfg_.one_wire_mirror;
+
+  ::atlantic_v5::RelayTask::Config cfg{};
+  cfg.hmi = hmi_io_cfg;
+  cfg.main = main_io_cfg;
+  cfg.relay_core = this->relay_core_;
+  cfg.self_test = this->self_test_;
+
+  this->relay_task_ = new ::atlantic_v5::RelayTask(cfg, this->policy_);
+  if (this->bus_capture_) {
+    this->hmi_capture_logger_ = new BusCaptureLogger("hmi");
+    this->main_capture_logger_ = new BusCaptureLogger("main");
+    this->relay_task_->set_capture_sink(&AtlanticV5Component::capture_sink_trampoline, this);
   }
-  if (len > 0)
-    this->capture_last_byte_us_ = now_us;
+  this->relay_task_->begin();
+}
 
-  if (this->capture_len_ == 0)
-    return;
-
-  // Flush on the plan's 4 ms silence backstop (2.1/2.5.1) or when the buffer
-  // hits the max observed frame size, whichever comes first.
-  bool silence_elapsed = (now_us - this->capture_last_byte_us_) >= CAPTURE_SILENCE_US;
-  bool buffer_full = this->capture_len_ >= sizeof(this->capture_buf_);
-  if (silence_elapsed || buffer_full)
-    flush(this->capture_last_byte_us_);
+void AtlanticV5Component::loop_mitm() {
+  ::atlantic_v5::FrameEvent events[8];  // plan 3.6.5: N=8, bounds loop time
+  size_t n = this->relay_task_->drain_events(events, 8);
+  for (size_t i = 0; i < n; i++) {
+    const auto &ev = events[i];
+    if (!ev.crc_ok)
+      continue;  // still forwarded on the wire (fail-safe); just not decoded
+    ::atlantic_v5::Frame f(ev.channel, ev.data, ev.len);
+    // Transaction-byte rule (plan 2.2): only MAIN's payload-bearing response
+    // resets the staleness gate, matching ticket 07's listener-mode semantics.
+    if (ev.channel == ::atlantic_v5::Channel::MAIN && f.has_payload())
+      this->last_main_us_ = ev.t_us;
+    this->decoder_.decode(f, &AtlanticV5Component::publish_trampoline, this);
+  }
+  this->update_staleness(static_cast<uint32_t>(esp_timer_get_time()));
 }
 #endif
 
@@ -187,7 +206,7 @@ void AtlanticV5Component::publish(const ::atlantic_v5::DecodedValue &v) {
 }
 
 void AtlanticV5Component::update_staleness(uint32_t now_us) {
-  bool is_stale = this->listener_.us_since_main(now_us) >= this->timeout_us_;
+  bool is_stale = this->us_since_main(now_us) >= this->timeout_us_;
   if (is_stale == this->stale_)
     return;
   this->stale_ = is_stale;
@@ -204,6 +223,14 @@ void AtlanticV5Component::update_staleness(uint32_t now_us) {
     static_cast<sensor::Sensor *>(this->entities_[id])->publish_state(NAN);
     this->has_last_published_[id] = false;
   }
+}
+
+uint32_t AtlanticV5Component::us_since_main(uint32_t now_us) const {
+#ifdef USE_ESP32
+  if (this->mode_ == Mode::MITM)
+    return now_us - this->last_main_us_;
+#endif
+  return this->listener_.us_since_main(now_us);
 }
 
 void AtlanticV5Component::dump_config() {

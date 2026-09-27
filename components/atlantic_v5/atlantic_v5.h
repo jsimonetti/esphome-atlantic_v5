@@ -9,10 +9,16 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 
 #include "catalog.h"
+#include "decoder.h"
 #include "listener.h"
+#include "relay_policy.h"
 
 #ifdef USE_ESP32
 #include <driver/uart.h>
+
+#include "bus_capture_logger.h"
+#include "relay_task.h"
+#include "uart_bus_io.h"
 #endif
 
 namespace esphome {
@@ -43,6 +49,13 @@ class AtlanticV5Component : public Component {
   // Listener::us_since_main() without a conversion on every loop() tick.
   void set_timeout(uint32_t timeout_ms) { timeout_us_ = timeout_ms * 1000ULL; }
 
+  // MITM-mode side wiring (plan 3.7.2/3.5.3). tx_enable_pin -1 means no DIR pin
+  // (case B); one_wire_mirror selects case C. Called once per side from to_code.
+  void set_hmi_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror);
+  void set_main_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror);
+  void set_relay_core(int core) { relay_core_ = core; }
+  void set_self_test(bool enabled) { self_test_ = enabled; }
+
   // Registers a read-only entity for EntityId id (core/catalog.h). obj must
   // outlive this component; kind selects which publish_state overload to call.
   void set_entity(uint16_t id, void *obj, EntityKind kind);
@@ -56,21 +69,43 @@ class AtlanticV5Component : public Component {
   static void publish_trampoline(void *ctx, const ::atlantic_v5::DecodedValue &v);
   void publish(const ::atlantic_v5::DecodedValue &v);
   void update_staleness(uint32_t now_us);
+  uint32_t us_since_main(uint32_t now_us) const;
 
 #ifdef USE_ESP32
   // M0.5: minimal listener-mode UART bring-up feeding bus_capture (3.5.5).
-  // Folds into transport/uart_bus_io.* once M6 builds the full BusIo layer.
   uart_port_t port_{UART_NUM_1};
 
-  // Frames are variable-length (plan 2.3), so bus_capture accumulates bytes
-  // across loop() calls and flushes on the plan's 4 ms silence backstop
-  // (2.1/2.5.1) rather than logging whatever a single loop() tick read.
-  static constexpr size_t CAPTURE_BUF_LEN = 32;  // matches the documented max frame size
-  uint8_t capture_buf_[CAPTURE_BUF_LEN]{};
-  size_t capture_len_{0};
-  int64_t capture_last_byte_us_{0};
+  void setup_listener();
+  void loop_listener();
+  void setup_mitm();
+  void loop_mitm();
+  static void capture_sink_trampoline(void *ctx, ::atlantic_v5::Channel channel, const uint8_t *data, size_t len,
+                                       uint32_t t_us);
 
-  void capture_bytes(const uint8_t *chunk, size_t len, int64_t now_us);
+  // Per-side MITM config (plan 3.7.2); unused in listener mode.
+  struct SideConfig {
+    int uart_num = -1;
+    int rx_pin = -1;
+    int tx_pin = -1;
+    int tx_enable_pin = -1;
+    bool one_wire_mirror = false;
+  };
+  SideConfig hmi_cfg_;
+  SideConfig main_cfg_;
+  int relay_core_{1};
+  bool self_test_{true};
+
+  ::atlantic_v5::RelayPolicy policy_;
+  ::atlantic_v5::RelayTask *relay_task_{nullptr};
+  // MITM frames arrive already-framed via RelayTask's FrameEvent queue, decoded
+  // here directly rather than through Listener (which owns its own single-bus
+  // assembler this path doesn't need).
+  ::atlantic_v5::Decoder decoder_;
+  uint32_t last_main_us_{0};
+
+  BusCaptureLogger *hmi_capture_logger_{nullptr};
+  BusCaptureLogger *main_capture_logger_{nullptr};
+  BusCaptureLogger capture_logger_{"bus"};  // listener mode's single tapped wire
 #endif
   Mode mode_{Mode::LISTENER};
   bool bus_capture_{false};

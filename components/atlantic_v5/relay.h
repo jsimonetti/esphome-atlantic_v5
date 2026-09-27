@@ -5,6 +5,7 @@
 
 #include "bus_io.h"
 #include "assembler.h"
+#include "frame.h"
 #include "relay_policy.h"
 #include "types.h"
 
@@ -22,6 +23,27 @@ class Relay {
   using Config = RelayConfig;
 
   Relay(BusIo &hmi_io, BusIo &main_io, RelayPolicy &policy, Config cfg = Config{});
+
+  // Raw pre-assembly byte capture (plan 3.5.5, MITM piggyback): invoked with every
+  // chunk read from either side, before echo classification, as a byproduct of
+  // reads the relay task is already doing — never an extra poll. Set once, before
+  // the first poll() call.
+  using CaptureSink = void (*)(void *ctx, Channel channel, const uint8_t *data, size_t len, uint32_t t_us);
+  void set_capture_sink(CaptureSink sink, void *ctx) {
+    capture_sink_ = sink;
+    capture_ctx_ = ctx;
+  }
+
+  // Cross-thread handoff (plan 3.6.5): invoked once per completed frame, after it
+  // has already been forwarded to the opposite side ("forward first, enqueue
+  // second", plan 3.9 #1) — a sink that drops the event can never affect
+  // forwarding, which has already happened by the time this runs. f reflects any
+  // rewrite RelayPolicy::apply already applied.
+  using FrameSink = void (*)(void *ctx, Channel channel, const Frame &f, uint32_t t_us);
+  void set_frame_sink(FrameSink sink, void *ctx) {
+    frame_sink_ = sink;
+    frame_ctx_ = ctx;
+  }
 
   // Services one iteration for both directions at now_us: drains whatever bytes
   // are currently available on each side, applies the silence backstop, and
@@ -61,6 +83,10 @@ class Relay {
   RelayPolicy &policy_;
   Config cfg_;
   Stats stats_;
+  CaptureSink capture_sink_ = nullptr;
+  void *capture_ctx_ = nullptr;
+  FrameSink frame_sink_ = nullptr;
+  void *frame_ctx_ = nullptr;
 };
 
 }  // namespace atlantic_v5

@@ -1,7 +1,23 @@
+import logging
+
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
+from esphome.components.esp32 import get_esp32_variant
+from esphome.components.esp32.const import (
+    VARIANT_ESP32C2,
+    VARIANT_ESP32C3,
+    VARIANT_ESP32C5,
+    VARIANT_ESP32C6,
+    VARIANT_ESP32C61,
+    VARIANT_ESP32H2,
+    VARIANT_ESP32H4,
+    VARIANT_ESP32H21,
+    VARIANT_ESP32S2,
+)
 from esphome.const import CONF_ID, CONF_MODE, CONF_RX_PIN, CONF_TIMEOUT, CONF_TX_PIN
+
+_LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@jsimonetti"]
 
@@ -30,18 +46,39 @@ CONF_HMI = "hmi"
 CONF_MAIN = "main"
 CONF_UART_NUM = "uart_num"
 CONF_BUS_CAPTURE = "bus_capture"
+CONF_TX_ENABLE_PIN = "tx_enable_pin"
+CONF_ONE_WIRE_MIRROR = "one_wire_mirror"
+CONF_RELAY_CORE = "relay_core"
+CONF_SELF_TEST = "self_test"
 # Referenced by the read-only-entity platform files (sensor.py etc.) to look up
 # this hub instance (plan 3.7.3's "cv.GenerateID(CONF_atlantic_v5_ID)").
 CONF_ATLANTIC_V5_ID = "atlantic_v5_id"
 
-# M0.5: only the pins actually consumed by listener-mode bus_capture (3.5.5).
-# tx_enable_pin / one_wire_mirror are not accepted yet: they land with M6, once
-# mitm transport exists to consume them.
+# ESP32-C3/S2 only have one UART port free besides the console (plan 3.5.2):
+# "MITM is unsupported on those variants; reject it at Python validation time".
+MITM_UNSUPPORTED_VARIANTS = {VARIANT_ESP32C3, VARIANT_ESP32S2}
+# Single-core targets: pinning to a specific core (plan 3.6.3's relay_core)
+# doesn't apply. xTaskCreatePinnedToCore still works with tskNO_AFFINITY, which
+# is what an unset relay_core resolves to on these variants (see to_code).
+SINGLE_CORE_VARIANTS = {
+    VARIANT_ESP32C2,
+    VARIANT_ESP32C3,
+    VARIANT_ESP32C5,
+    VARIANT_ESP32C6,
+    VARIANT_ESP32C61,
+    VARIANT_ESP32H2,
+    VARIANT_ESP32H4,
+    VARIANT_ESP32H21,
+    VARIANT_ESP32S2,
+}
+
 SIDE_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_UART_NUM): cv.int_,
         cv.Required(CONF_RX_PIN): pins.internal_gpio_input_pin_number,
         cv.Optional(CONF_TX_PIN): pins.internal_gpio_output_pin_number,
+        cv.Optional(CONF_TX_ENABLE_PIN): pins.internal_gpio_output_pin_number,
+        cv.Optional(CONF_ONE_WIRE_MIRROR, default=False): cv.boolean,
     }
 )
 
@@ -51,15 +88,36 @@ def _validate_sides(config):
     # separately as .enum_value); comparing against MODES[...] compares a str
     # to a codegen MockObj, whose __eq__ builds a C++ expression that is
     # always truthy, so this branch would fire unconditionally.
-    if config[CONF_MODE] == MODE_MITM:
-        # MITM transport (3.5, 3.6) isn't built yet; don't accept a config that
-        # would silently do nothing.
-        raise cv.Invalid("mode: mitm is not implemented yet (lands at M6); use mode: listener")
     has_hmi = CONF_HMI in config
     has_main = CONF_MAIN in config
+
+    if config[CONF_MODE] == MODE_MITM:
+        if not (has_hmi and has_main):
+            raise cv.Invalid("mode: mitm requires both 'hmi:' and 'main:'")
+        for key in (CONF_HMI, CONF_MAIN):
+            if CONF_TX_PIN not in config[key]:
+                raise cv.Invalid(f"'{key}: tx_pin' is required in mode: mitm", path=[key])
+        if CONF_TX_ENABLE_PIN not in config[CONF_HMI] and CONF_TX_ENABLE_PIN not in config[CONF_MAIN]:
+            _LOGGER.warning(
+                "mode: mitm with neither side's tx_enable_pin set: transmission may not reach the "
+                "bus unless the transceiver can always drive it, or the bus is open-drain. Check "
+                "the self-test result once running (self_test: true, the default)."
+            )
+        return config
+
     if has_hmi == has_main:  # neither, or both
         raise cv.Invalid("mode: listener requires exactly one of 'hmi:' or 'main:'")
     return config
+
+
+def _final_validate(config):
+    if config[CONF_MODE] != MODE_MITM:
+        return
+    variant = get_esp32_variant()
+    if variant in MITM_UNSUPPORTED_VARIANTS:
+        raise cv.Invalid(f"mode: mitm requires two free UART ports; not supported on {variant}")
+    if CONF_RELAY_CORE in config and variant in SINGLE_CORE_VARIANTS:
+        raise cv.Invalid(f"relay_core is not applicable on the single-core {variant}", path=[CONF_RELAY_CORE])
 
 
 CONFIG_SCHEMA = cv.All(
@@ -74,10 +132,16 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_TIMEOUT, default="60s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_HMI): SIDE_SCHEMA,
             cv.Optional(CONF_MAIN): SIDE_SCHEMA,
+            # No default here: absence (vs. an explicit value) is meaningful,
+            # see to_code and _final_validate.
+            cv.Optional(CONF_RELAY_CORE): cv.int_range(min=0, max=1),
+            cv.Optional(CONF_SELF_TEST, default=True): cv.boolean,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     _validate_sides,
 )
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 async def to_code(config):
@@ -86,6 +150,27 @@ async def to_code(config):
     cg.add(var.set_mode(config[CONF_MODE]))
     cg.add(var.set_bus_capture(config[CONF_BUS_CAPTURE]))
     cg.add(var.set_timeout(config[CONF_TIMEOUT]))
+
+    if config[CONF_MODE] == MODE_MITM:
+        for key, setter in ((CONF_HMI, var.set_hmi_uart), (CONF_MAIN, var.set_main_uart)):
+            side = config[key]
+            setter_args = [
+                side[CONF_UART_NUM],
+                side[CONF_RX_PIN],
+                side[CONF_TX_PIN],
+                side.get(CONF_TX_ENABLE_PIN, -1),
+                side[CONF_ONE_WIRE_MIRROR],
+            ]
+            cg.add(setter(*setter_args))
+
+        # plan 3.6.3: "1 on dual-core, tskNO_AFFINITY otherwise" — tskNO_AFFINITY
+        # is passed through as -1 (see RelayTask::begin()).
+        relay_core = config.get(CONF_RELAY_CORE)
+        if relay_core is None:
+            relay_core = -1 if get_esp32_variant() in SINGLE_CORE_VARIANTS else 1
+        cg.add(var.set_relay_core(relay_core))
+        cg.add(var.set_self_test(config[CONF_SELF_TEST]))
+        return
 
     side = config.get(CONF_HMI, config.get(CONF_MAIN))
     cg.add(var.set_uart_num(side[CONF_UART_NUM]))

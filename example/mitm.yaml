@@ -1,0 +1,51 @@
+substitutions:
+  board: arduino_nano_esp32
+
+esphome:
+  name: atlantic-v5-mitm
+
+esp32:
+  board: ${board}
+  framework:
+    type: esp-idf
+
+logger:
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+
+atlantic_v5:
+  id: dhw
+  mode: mitm
+  bus_capture: true
+  self_test: true
+  timeout: 60s
+  hmi:
+    uart_num: 1
+    rx_pin: GPIO7
+    tx_pin: GPIO8
+    tx_enable_pin: GPIO21
+  main:
+    uart_num: 2
+    rx_pin: GPIO5
+    tx_pin: GPIO6
+    tx_enable_pin: GPIO18
+
+sensor:
+  - platform: atlantic_v5
+    water_temperature:
+      name: DHW water temperature
+    setpoint:
+      name: DHW setpoint
+
+binary_sensor:
+  - platform: atlantic_v5
+    heating_active:
+      name: DHW heating
+
+text_sensor:
+  - platform: atlantic_v5
+    serial_number:
+      name: DHW serial number
