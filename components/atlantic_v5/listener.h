@@ -42,6 +42,9 @@ class Listener {
   // the staleness gate open forever.
   void tick(uint32_t t_us);
 
+  // The frame_silence knob (ticket 17). Set before the first push_byte().
+  void set_silence_us(uint32_t us) { assembler_.set_silence_us(us); }
+
   // Microseconds since the last CRC-valid, payload-bearing MAIN-origin frame
   // (plan 2.2: a payload-bearing 0x64 frame can only be MAIN's response - HMI's
   // 0x64 requests are always payload-less). Callers compare this against their

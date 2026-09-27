@@ -16,14 +16,17 @@
 
 namespace atlantic_v5 {
 
+inline constexpr uint32_t DEFAULT_DIR_SETUP_US = 10;   // plan 3.5.3 case A default
+inline constexpr uint32_t DEFAULT_DIR_HOLD_US = 260;  // plan 3.5.3 case A default (~1 byte time)
+
 struct UartBusIoConfig {
   uart_port_t port = UART_NUM_1;
   int rx_pin = -1;
   int tx_pin = -1;
   int tx_enable_pin = -1;    // DIR pin, -1 = none (plan 3.5.3 case B)
   bool one_wire_mirror = false;  // plan 3.5.3 case C
-  uint32_t dir_setup_us = 10;    // plan 3.5.3 case A default
-  uint32_t dir_hold_us = 260;    // plan 3.5.3 case A default (~1 byte time)
+  uint32_t dir_setup_us = DEFAULT_DIR_SETUP_US;
+  uint32_t dir_hold_us = DEFAULT_DIR_HOLD_US;
 };
 
 class UartBusIo : public BusIo {

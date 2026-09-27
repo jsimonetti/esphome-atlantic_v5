@@ -87,6 +87,7 @@ void AtlanticV5Component::setup_listener() {
   uart_set_rx_full_threshold(this->port_, 1);
   uart_set_rx_timeout(this->port_, 2);
 
+  this->listener_.set_silence_us(this->frame_silence_us_);
   this->listener_.set_sink(&AtlanticV5Component::publish_trampoline, this);
   this->listener_.set_frame_sink(&AtlanticV5Component::frame_dump_trampoline, this);
 }
@@ -110,13 +111,14 @@ void AtlanticV5Component::loop_listener() {
   this->update_diagnostics(now_us32);
 }
 
-void AtlanticV5Component::set_hmi_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror) {
-  this->hmi_cfg_ = {uart_num, rx_pin, tx_pin, tx_enable_pin, one_wire_mirror};
+void AtlanticV5Component::set_hmi_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror,
+                                       uint32_t dir_setup_us, uint32_t dir_hold_us) {
+  this->hmi_cfg_ = {uart_num, rx_pin, tx_pin, tx_enable_pin, one_wire_mirror, dir_setup_us, dir_hold_us};
 }
 
 void AtlanticV5Component::set_main_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin,
-                                         bool one_wire_mirror) {
-  this->main_cfg_ = {uart_num, rx_pin, tx_pin, tx_enable_pin, one_wire_mirror};
+                                         bool one_wire_mirror, uint32_t dir_setup_us, uint32_t dir_hold_us) {
+  this->main_cfg_ = {uart_num, rx_pin, tx_pin, tx_enable_pin, one_wire_mirror, dir_setup_us, dir_hold_us};
 }
 
 void AtlanticV5Component::capture_sink_trampoline(void *ctx, ::atlantic_v5::Channel channel, const uint8_t *data,
@@ -134,6 +136,8 @@ void AtlanticV5Component::setup_mitm() {
   hmi_io_cfg.tx_pin = this->hmi_cfg_.tx_pin;
   hmi_io_cfg.tx_enable_pin = this->hmi_cfg_.tx_enable_pin;
   hmi_io_cfg.one_wire_mirror = this->hmi_cfg_.one_wire_mirror;
+  hmi_io_cfg.dir_setup_us = this->hmi_cfg_.dir_setup_us;
+  hmi_io_cfg.dir_hold_us = this->hmi_cfg_.dir_hold_us;
 
   ::atlantic_v5::UartBusIoConfig main_io_cfg{};
   main_io_cfg.port = static_cast<uart_port_t>(this->main_cfg_.uart_num);
@@ -141,10 +145,14 @@ void AtlanticV5Component::setup_mitm() {
   main_io_cfg.tx_pin = this->main_cfg_.tx_pin;
   main_io_cfg.tx_enable_pin = this->main_cfg_.tx_enable_pin;
   main_io_cfg.one_wire_mirror = this->main_cfg_.one_wire_mirror;
+  main_io_cfg.dir_setup_us = this->main_cfg_.dir_setup_us;
+  main_io_cfg.dir_hold_us = this->main_cfg_.dir_hold_us;
 
   ::atlantic_v5::RelayTask::Config cfg{};
   cfg.hmi = hmi_io_cfg;
   cfg.main = main_io_cfg;
+  cfg.relay.silence_us = this->frame_silence_us_;
+  cfg.relay.echo_drain_us = this->echo_drain_us_;
   cfg.relay_core = this->relay_core_;
   cfg.self_test = this->self_test_;
 

@@ -103,8 +103,11 @@ void RelayTask::run_self_test() {
   // something is arriving on at least one side before deciding anything further.
   uint32_t start_us = this->hmi_io_.now_us();
   bool hmi_seen = false, main_seen = false;
-  FrameAssembler hmi_asm(Channel::HMI, /*dual_bus=*/true);
-  FrameAssembler main_asm(Channel::MAIN, /*dual_bus=*/true);
+  // The self-test frames the listen window with its own short-lived
+  // assemblers, so they need the same configured backstop the relay uses.
+  const uint32_t silence_us = this->relay_.config().silence_us;
+  FrameAssembler hmi_asm(Channel::HMI, /*dual_bus=*/true, silence_us);
+  FrameAssembler main_asm(Channel::MAIN, /*dual_bus=*/true, silence_us);
   uint8_t hmi_probe[MAX_FRAME]{};
   uint8_t hmi_probe_len = 0;
   uint8_t main_probe[MAX_FRAME]{};

@@ -22,16 +22,25 @@ atlantic_v5:
   bus_capture: true
   self_test: true
   timeout: 60s
+  # Bus timing (defaults shown; uncomment to tune on unfamiliar hardware).
+  # frame_silence: 4000us
+  # echo_drain: 200us
   hmi:
     uart_num: 1
     rx_pin: GPIO7
     tx_pin: GPIO8
-    tx_enable_pin: GPIO21
+    tx_enable_pin: GPIO10
+    one_wire_mirror: true
+    # dir_setup: 10us
+    # dir_hold: 260us
   main:
     uart_num: 2
     rx_pin: GPIO5
     tx_pin: GPIO6
-    tx_enable_pin: GPIO18
+    tx_enable_pin: GPIO9
+    one_wire_mirror: true
+    # dir_setup: 10us
+    # dir_hold: 260us
 
 sensor:
   - platform: atlantic_v5

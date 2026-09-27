@@ -68,12 +68,14 @@ atlantic_v5:
     uart_num: 1
     rx_pin: GPIO7
     tx_pin: GPIO8
-    tx_enable_pin: GPIO21   # omit if your transceiver has no DIR pin
+    tx_enable_pin: GPIO10   # omit if your transceiver has no DIR pin
+    one_wire_mirror: true
   main:
     uart_num: 2
     rx_pin: GPIO5
     tx_pin: GPIO6
-    tx_enable_pin: GPIO18
+    tx_enable_pin: GPIO9
+    one_wire_mirror: true
 ```
 
 Both `hmi:` and `main:` are required, each needs a `tx_pin`, and the target
@@ -106,8 +108,25 @@ what this component was developed against.
 
 Board-specific notes for this component:
 
+- Pin mapping, taken from AquaMQTT's own `Configuration.h` (the
+  `ENV_DEVKIT_ESP32` branch, which spells the same nets as raw GPIO numbers —
+  what this component needs, since it drives the ESP-IDF UART driver directly
+  and no Arduino pin remap applies):
+
+  | Signal | MAIN | HMI |
+  | --- | --- | --- |
+  | RX | GPIO5 | GPIO7 |
+  | TX | GPIO6 | GPIO8 |
+  | TX-enable (DIR, revision 2.0) | GPIO9 | GPIO10 |
+
+  The `#else` branch of that same file spells the identical nets as Arduino
+  Nano ESP32 logical pins (D2/D3, D4/D5, D6/D7), which remap to exactly the
+  GPIO numbers above. Reading those TX-enable numbers as logical pins and
+  remapping them a second time yields GPIO18/GPIO21 — a plausible-looking but
+  wrong mapping this project carried for a while.
 - The AquaMQTT board routes each side's TX and RX onto one physical bus wire,
-  so set `one_wire_mirror: true` (Case C below) on both sides.
+  so set `one_wire_mirror: true` (Case C below) on both sides. On revision 2.0
+  this is needed *in addition to* `tx_enable_pin`, not instead of it.
 - Revision 2.0's passthrough jumper must be **installed** for `mode: listener`
   and **removed** for `mode: mitm`.
 - Not every board in circulation exposes DIR / TX-enable lines. Without them,
@@ -119,9 +138,9 @@ Board-specific notes for this component:
 
 Set `tx_enable_pin` on that side. Both DIR pins are parked LOW (receive) at
 setup and never driven while idle. Before every transmit: DIR high, wait
-`dir_setup_us` (default 10 µs), write, wait for the UART to finish shifting
-the bytes out, hold DIR high for `dir_hold_us` (default 260 µs, about one byte
-time), then DIR low again.
+`dir_setup` (default 10 µs), write, wait for the UART to finish shifting
+the bytes out, hold DIR high for `dir_hold` (default 260 µs, about one byte
+time), then DIR low again. Both are tunable — see "Bus timing" below.
 
 ### Case B — no DIR pin
 
@@ -138,6 +157,41 @@ appear on both the TX and RX pins, and during receive neither pin may be
 driven. Set `one_wire_mirror: true` on that side to enable it; combine with
 `tx_enable_pin` if the board also has a DIR line to assert around the
 transmit window.
+
+## Bus timing
+
+Framing and line turnaround are governed by four timings. The defaults are
+what this component was developed against; they are exposed so hardware this
+project has never seen can be tuned without rebuilding anything. Leave them
+unset unless something is actually wrong.
+
+| Key | Where | Default | What it does |
+| --- | --- | --- | --- |
+| `frame_silence` | `atlantic_v5:` | `4000us` | Idle time after which a partially received frame is closed and handed on. Raise it if long frames are being cut in half; lower it only if you know the bus is faster than this component assumes. Must be non-zero. |
+| `echo_drain` | `atlantic_v5:` | `200us` | `mitm` only. Bytes arriving on a side within this window of a write *to* that side are treated as the transceiver's own echo and discarded. Too low and your own transmissions get relayed back; too high and a fast reply from the other end is swallowed. |
+| `dir_setup` | `hmi:` / `main:` | `10us` | `mitm`, Case A only. Delay between asserting DIR and starting to write. |
+| `dir_hold` | `hmi:` / `main:` | `260us` | `mitm`, Case A only. How long DIR stays asserted after the last byte has shifted out. |
+
+`dir_setup` and `dir_hold` are per side because the two sides can genuinely be
+wired with different transceivers. They are rejected in `mode: listener`,
+which never drives a line and so would silently ignore them.
+
+```yaml
+atlantic_v5:
+  id: dhw
+  mode: mitm
+  frame_silence: 4000us
+  echo_drain: 200us
+  hmi:
+    uart_num: 1
+    rx_pin: GPIO7
+    tx_pin: GPIO8
+    tx_enable_pin: GPIO10
+    dir_setup: 10us
+    dir_hold: 260us
+  main:
+    # ...
+```
 
 ## Startup self-test
 

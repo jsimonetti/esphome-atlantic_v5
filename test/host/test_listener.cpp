@@ -184,5 +184,26 @@ int main() {
     CHECK(l.us_since_main(0) == 0);
   }
 
+  // --- set_silence_us (ticket 17's frame_silence knob) actually reaches the
+  // assembler: the same partial frame and the same tick() instant close under
+  // a shortened backstop and stay open under the default one. ---
+  {
+    const uint32_t short_silence = atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US / 8;
+    auto frame = build_frame({0x01, 0x64, 0x14, 0xB7, 0x01, 0x02, 0x11, 0xC6});
+
+    Listener tuned;
+    tuned.set_silence_us(short_silence);
+    Listener stock;
+    for (size_t i = 0; i + 1 < frame.size(); i++) {
+      tuned.push_byte(frame[i], 0);
+      stock.push_byte(frame[i], 0);
+    }
+    tuned.tick(short_silence);
+    stock.tick(short_silence);
+
+    CHECK(tuned.assembler_stats().silence_closes == 1);
+    CHECK(stock.assembler_stats().silence_closes == 0);
+  }
+
   TEST_MAIN_RETURN();
 }

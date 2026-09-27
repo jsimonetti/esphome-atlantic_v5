@@ -11,6 +11,7 @@
 #include "catalog.h"
 #include "decoder.h"
 #include "listener.h"
+#include "relay.h"
 #include "relay_policy.h"
 
 #ifdef USE_ESP32
@@ -50,10 +51,17 @@ class AtlanticV5Component : public Component {
   // Listener::us_since_main() without a conversion on every loop() tick.
   void set_timeout(uint32_t timeout_ms) { timeout_us_ = timeout_ms * 1000ULL; }
 
+  // Bus timing knobs (ticket 17). frame_silence is the framing backstop used
+  // by every assembler in both modes; echo_drain is mitm-only.
+  void set_frame_silence(uint32_t us) { frame_silence_us_ = us; }
+  void set_echo_drain(uint32_t us) { echo_drain_us_ = us; }
+
   // MITM-mode side wiring (plan 3.7.2/3.5.3). tx_enable_pin -1 means no DIR pin
   // (case B); one_wire_mirror selects case C. Called once per side from to_code.
-  void set_hmi_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror);
-  void set_main_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror);
+  void set_hmi_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror,
+                    uint32_t dir_setup_us, uint32_t dir_hold_us);
+  void set_main_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror,
+                     uint32_t dir_setup_us, uint32_t dir_hold_us);
   void set_relay_core(int core) { relay_core_ = core; }
   void set_self_test(bool enabled) { self_test_ = enabled; }
 
@@ -115,6 +123,8 @@ class AtlanticV5Component : public Component {
     int tx_pin = -1;
     int tx_enable_pin = -1;
     bool one_wire_mirror = false;
+    uint32_t dir_setup_us = ::atlantic_v5::DEFAULT_DIR_SETUP_US;
+    uint32_t dir_hold_us = ::atlantic_v5::DEFAULT_DIR_HOLD_US;
   };
   SideConfig hmi_cfg_;
   SideConfig main_cfg_;
@@ -146,6 +156,8 @@ class AtlanticV5Component : public Component {
   int rx_pin_{-1};
   int tx_pin_{-1};
   uint32_t timeout_us_{60'000'000};  // plan 3.7.1 default 60s
+  uint32_t frame_silence_us_{::atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US};
+  uint32_t echo_drain_us_{::atlantic_v5::DEFAULT_ECHO_DRAIN_US};
 
   ::atlantic_v5::Listener listener_;
   void *entities_[::atlantic_v5::ENT_COUNT]{};

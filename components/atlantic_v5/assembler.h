@@ -34,6 +34,10 @@ class FrameAssembler {
   // Discards any partially-buffered frame without touching stats().
   void reset();
 
+  // For callers that can't pass the value at construction because the
+  // assembler is a member of a default-constructed owner (Listener).
+  void set_silence_us(uint32_t us) { silence_us_ = us; }
+
   struct Stats {
     uint32_t frames = 0;
     uint32_t crc_errors = 0;

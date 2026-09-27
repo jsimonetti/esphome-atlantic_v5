@@ -50,6 +50,10 @@ CONF_TX_ENABLE_PIN = "tx_enable_pin"
 CONF_ONE_WIRE_MIRROR = "one_wire_mirror"
 CONF_RELAY_CORE = "relay_core"
 CONF_SELF_TEST = "self_test"
+CONF_FRAME_SILENCE = "frame_silence"
+CONF_ECHO_DRAIN = "echo_drain"
+CONF_DIR_SETUP = "dir_setup"
+CONF_DIR_HOLD = "dir_hold"
 # Referenced by the read-only-entity platform files (sensor.py etc.) to look up
 # this hub instance (plan 3.7.3's "cv.GenerateID(CONF_atlantic_v5_ID)").
 CONF_ATLANTIC_V5_ID = "atlantic_v5_id"
@@ -72,6 +76,17 @@ SINGLE_CORE_VARIANTS = {
     VARIANT_ESP32S2,
 }
 
+# The four bus timing defaults (ticket 17), duplicated from C++ so they show up
+# in the resolved YAML. Keep in step with FrameAssembler::DEFAULT_SILENCE_US
+# (assembler.h), DEFAULT_ECHO_DRAIN_US (relay.h), and DEFAULT_DIR_SETUP_US /
+# DEFAULT_DIR_HOLD_US (uart_bus_io.h). dir_setup/dir_hold carry no schema
+# default, so that setting either one in mode: listener can be rejected rather
+# than silently ignored; to_code supplies the fallback instead.
+DEFAULT_FRAME_SILENCE_US = 4000
+DEFAULT_ECHO_DRAIN_US = 200
+DEFAULT_DIR_SETUP_US = 10
+DEFAULT_DIR_HOLD_US = 260
+
 SIDE_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_UART_NUM): cv.int_,
@@ -79,6 +94,8 @@ SIDE_SCHEMA = cv.Schema(
         cv.Optional(CONF_TX_PIN): pins.internal_gpio_output_pin_number,
         cv.Optional(CONF_TX_ENABLE_PIN): pins.internal_gpio_output_pin_number,
         cv.Optional(CONF_ONE_WIRE_MIRROR, default=False): cv.boolean,
+        cv.Optional(CONF_DIR_SETUP): cv.positive_time_period_microseconds,
+        cv.Optional(CONF_DIR_HOLD): cv.positive_time_period_microseconds,
     }
 )
 
@@ -107,6 +124,13 @@ def _validate_sides(config):
 
     if has_hmi == has_main:  # neither, or both
         raise cv.Invalid("mode: listener requires exactly one of 'hmi:' or 'main:'")
+    # The DIR knobs only ever reach UartBusIo, which mode: listener never
+    # builds - accepting them here would be accepting a setting that does
+    # nothing.
+    side_key = CONF_HMI if has_hmi else CONF_MAIN
+    for key in (CONF_DIR_SETUP, CONF_DIR_HOLD):
+        if key in config[side_key]:
+            raise cv.Invalid(f"'{key}' only applies in mode: mitm", path=[side_key, key])
     return config
 
 
@@ -136,6 +160,14 @@ CONFIG_SCHEMA = cv.All(
             # see to_code and _final_validate.
             cv.Optional(CONF_RELAY_CORE): cv.int_range(min=0, max=1),
             cv.Optional(CONF_SELF_TEST, default=True): cv.boolean,
+            # Ticket 17. frame_silence must be non-zero: at zero the backstop
+            # fires on every tick and no frame ever assembles.
+            cv.Optional(CONF_FRAME_SILENCE, default=f"{DEFAULT_FRAME_SILENCE_US}us"): cv.All(
+                cv.positive_not_null_time_period, cv.positive_time_period_microseconds
+            ),
+            cv.Optional(
+                CONF_ECHO_DRAIN, default=f"{DEFAULT_ECHO_DRAIN_US}us"
+            ): cv.positive_time_period_microseconds,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     _validate_sides,
@@ -150,6 +182,8 @@ async def to_code(config):
     cg.add(var.set_mode(config[CONF_MODE]))
     cg.add(var.set_bus_capture(config[CONF_BUS_CAPTURE]))
     cg.add(var.set_timeout(config[CONF_TIMEOUT]))
+    cg.add(var.set_frame_silence(config[CONF_FRAME_SILENCE]))
+    cg.add(var.set_echo_drain(config[CONF_ECHO_DRAIN]))
 
     if config[CONF_MODE] == MODE_MITM:
         for key, setter in ((CONF_HMI, var.set_hmi_uart), (CONF_MAIN, var.set_main_uart)):
@@ -160,6 +194,8 @@ async def to_code(config):
                 side[CONF_TX_PIN],
                 side.get(CONF_TX_ENABLE_PIN, -1),
                 side[CONF_ONE_WIRE_MIRROR],
+                side.get(CONF_DIR_SETUP, DEFAULT_DIR_SETUP_US),
+                side.get(CONF_DIR_HOLD, DEFAULT_DIR_HOLD_US),
             ]
             cg.add(setter(*setter_args))
 

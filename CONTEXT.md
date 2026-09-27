@@ -34,7 +34,14 @@ A transport-layer Side's current pin-drive state, `RX` or `TX`.
 _Avoid_: Dir, direction (ambiguous with Origin)
 
 **DIR / TX-enable**:
-The physical GPIO that switches a transceiver between transmit and receive. Distinct from LineMode (the software-tracked drive state) and Origin (the catalogue's data-flow column).
+The physical GPIO that switches a transceiver between transmit and receive. Distinct from LineMode (the software-tracked drive state) and Origin (the catalogue's data-flow column). Its two timings, `dir_setup` (assert-to-first-byte) and `dir_hold` (last-byte-to-deassert), are per Side because the two sides can be wired with different transceivers.
+
+**Silence backstop** (`frame_silence`):
+The idle time after which a partially received Frame is closed and handed on regardless of length rules. A property of the protocol, so one value governs every FrameAssembler in both modes.
+_Avoid_: timeout (that is the MAIN-quiet staleness gate)
+
+**Echo drain** (`echo_drain`):
+The window after a write to a Side during which bytes arriving back on that same Side are our own transceiver's echo, and are discarded rather than framed. MITM only.
 
 **Controllable entity**:
 An entity whose ESPHome-side action writes into shared runtime state read by the relay task. Currently only the `select` control-mode entity, which writes into RelayPolicy.

@@ -11,11 +11,13 @@
 
 namespace atlantic_v5 {
 
+inline constexpr uint32_t DEFAULT_ECHO_DRAIN_US = 200;  // plan 3.5.3 default
+
 // Declared outside Relay: a nested struct's default member initializers can't be
 // used in a default argument of the enclosing class's own constructor.
 struct RelayConfig {
   uint32_t silence_us = FrameAssembler::DEFAULT_SILENCE_US;  // plan 2.1/2.5.1 backstop
-  uint32_t echo_drain_us = 200;                              // plan 3.5.3 default
+  uint32_t echo_drain_us = DEFAULT_ECHO_DRAIN_US;
 };
 
 class Relay {
@@ -79,6 +81,7 @@ class Relay {
   }
   const FrameAssembler::Stats &hmi_stats() const { return hmi_.asm_.stats(); }
   const FrameAssembler::Stats &main_stats() const { return main_.asm_.stats(); }
+  const Config &config() const { return cfg_; }
 
  private:
   struct Side {
