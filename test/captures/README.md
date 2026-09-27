@@ -14,6 +14,11 @@ values reviewed by a human against real hardware, which synthetic data
 cannot satisfy. Real captures (once available) should not carry the
 `synthetic_` prefix.
 
+`synthetic_unmapped_only.csv` is every header in `docs/protocol.md`'s
+*Unmapped messages* table, once each: routine traffic with no established
+meaning. `test_decoder` replays it to prove none of it reaches the
+unknown-frame diagnostics.
+
 `external_*.csv` are transcribed from third-party reports (e.g. GitHub issue
 comments from other AquaMQTT users/contributors) rather than captured by this
 project on its own hardware. Each file's leading `#` comment lines record the

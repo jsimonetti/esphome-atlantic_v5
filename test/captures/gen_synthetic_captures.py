@@ -191,6 +191,61 @@ def build_single_bus_capture() -> list[Row]:
     return rows
 
 
+def build_unmapped_only_capture() -> list[Row]:
+    """Every header in docs/protocol.md's "Unmapped messages" table, once.
+
+    Payloads are the table's own Observed column. Origin follows byte 1 of the
+    header (0x64 = MAIN's response, 0x65 = HMI's write), so each transaction is
+    a payload-less request/ack on one channel and the payload frame on the other.
+    """
+    unmapped = [
+        ("0164006501", "31323334353637383930313233"),  # ASCII digits
+        ("0164007001", "083F"),
+        ("0164007101", "0315"),
+        ("0164007501", "02"),
+        ("0164152A01", "0006"),
+        ("0164158301", "1838"),
+        ("016421B601", "0000"),
+        ("0164FDED01", "00"),
+        ("0164FDFA01", "05"),
+        ("0164FDFD01", "00"),
+        ("0164FE0001", "01"),
+        ("0164FED801", "00"),
+        ("0164FFDC01", "04B0"),
+        ("0165152301", "00C8"),
+        ("016516B301", "01"),
+        ("0165FDF802", "0007"),
+        ("0165FDFB02", "0011"),
+        ("0165FDFE02", "0001"),
+        ("0165FEF701", "00"),
+        ("0165FEF901", "64"),
+        ("0165FEFB01", "64"),
+        ("0165FEFD01", "00"),
+        ("0165FEFF01", "00"),
+        ("0165FF0101", "FFFFFFFF64"),
+        ("0165FF0301", "2D"),
+    ]
+
+    rows: list[Row] = []
+    t = 3_000_000
+    for header_hex, payload_hex in unmapped:
+        header = bytes.fromhex(header_hex)
+        payload = bytes.fromhex(payload_hex)
+        if header[1] == 0x64:  # MAIN answers: HMI reads, MAIN responds with the payload
+            rows.append(Row(t, "hmi", payload_less_frame(header)))
+            rows.append(Row(t + 4_000, "main", payload_frame(header, payload)))
+        else:  # HMI writes the payload, MAIN acks payload-less
+            rows.append(Row(t, "hmi", payload_frame(header, payload)))
+            rows.append(Row(t + 4_000, "main", payload_less_frame(header)))
+        t += 50_000
+
+    # The two payload-less init headers listed under the same table.
+    rows.append(Row(t, "hmi", payload_less_frame(bytes.fromhex("01640165FE"))))
+    rows.append(Row(t + 3_000, "hmi", payload_less_frame(bytes.fromhex("016443130D"))))
+
+    return rows
+
+
 def write_capture(name: str, rows: list[Row]) -> None:
     path = CAPTURES_DIR / name
     path.write_text("\n".join(row.to_csv_line() for row in rows) + "\n")
@@ -200,6 +255,7 @@ def write_capture(name: str, rows: list[Row]) -> None:
 def main() -> None:
     dual_bus = build_dual_bus_capture()
     single_bus = build_single_bus_capture()
+    unmapped_only = build_unmapped_only_capture()
 
     total_rows = len(dual_bus) + len(single_bus)
     assert total_rows >= 20, f"expected at least 20 frames total, got {total_rows}"
@@ -209,6 +265,7 @@ def main() -> None:
 
     write_capture("synthetic_dual_bus_basic.csv", dual_bus)
     write_capture("synthetic_single_bus_interleaved.csv", single_bus)
+    write_capture("synthetic_unmapped_only.csv", unmapped_only)
 
 
 if __name__ == "__main__":

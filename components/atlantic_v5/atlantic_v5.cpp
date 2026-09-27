@@ -217,8 +217,7 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   uint32_t frames_relayed = 0, rewrites_applied = 0, echo_bytes = 0, queue_overflows = 0;
   uint32_t latency_max_us = 0, task_stack_free = 0;
   float latency_avg_us = 0;
-  uint32_t unknown_frames;
-  uint64_t last_unknown_header;
+  const ::atlantic_v5::Decoder::Stats *dec_stats;
 
   if (this->mode_ == Mode::MITM) {
     const auto &hmi = this->relay_task_->hmi_stats();
@@ -227,8 +226,7 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     crc_errors = hmi.crc_errors + main.crc_errors;
     resyncs = hmi.resyncs + main.resyncs;
     dropped_bytes = hmi.dropped_bytes + main.dropped_bytes;
-    unknown_frames = this->decoder_.stats().unknown_headers;
-    last_unknown_header = this->decoder_.stats().last_unknown_header;
+    dec_stats = &this->decoder_.stats();
 
     const auto &relay_stats = this->relay_task_->stats();
     frames_relayed = relay_stats.frames_relayed;
@@ -245,15 +243,14 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     crc_errors = asm_stats.crc_errors;
     resyncs = asm_stats.resyncs;
     dropped_bytes = asm_stats.dropped_bytes;
-    unknown_frames = this->listener_.decoder_stats().unknown_headers;
-    last_unknown_header = this->listener_.decoder_stats().last_unknown_header;
+    dec_stats = &this->listener_.decoder_stats();
   }
 
   this->publish_diag_uint(::atlantic_v5::ENT_FRAMES_OK, frames_ok);
   this->publish_diag_uint(::atlantic_v5::ENT_CRC_ERRORS, crc_errors);
   this->publish_diag_uint(::atlantic_v5::ENT_RESYNCS, resyncs);
   this->publish_diag_uint(::atlantic_v5::ENT_DROPPED_BYTES, dropped_bytes);
-  this->publish_diag_uint(::atlantic_v5::ENT_UNKNOWN_FRAMES, unknown_frames);
+  this->publish_diag_uint(::atlantic_v5::ENT_UNKNOWN_FRAMES, dec_stats->unknown_headers);
   this->publish_diag_uint(::atlantic_v5::ENT_FRAMES_RELAYED, frames_relayed);
   this->publish_diag_uint(::atlantic_v5::ENT_REWRITES_APPLIED, rewrites_applied);
   this->publish_diag_uint(::atlantic_v5::ENT_ECHO_BYTES, echo_bytes);
@@ -269,8 +266,10 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
 
   // last_unknown_frame: rate-limited to once/10s (plan 3.8), and only when a
   // *new* unknown header has actually appeared since the last time we looked.
-  bool new_unknown = unknown_frames != this->last_unknown_headers_seen_;
-  this->last_unknown_headers_seen_ = unknown_frames;
+  // Unmapped headers (docs/protocol.md) never reach this counter, so it only
+  // moves for traffic we have genuinely never seen before.
+  bool new_unknown = dec_stats->unknown_headers != this->last_unknown_headers_seen_;
+  this->last_unknown_headers_seen_ = dec_stats->unknown_headers;
   if (!new_unknown || now_us - this->last_unknown_frame_us_ < 10'000'000)
     return;
   this->last_unknown_frame_us_ = now_us;
@@ -278,8 +277,17 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   void *obj = this->entities_[::atlantic_v5::ENT_LAST_UNKNOWN_FRAME];
   if (obj == nullptr || this->kinds_[::atlantic_v5::ENT_LAST_UNKNOWN_FRAME] != EntityKind::TEXT_SENSOR)
     return;
-  char hex[::atlantic_v5::HEADER_LEN * 2 + 1];
-  format_header_hex(last_unknown_header, hex);
+  // Header hex, then a separating space, then payload hex, then the NUL.
+  char hex[(::atlantic_v5::HEADER_LEN + ::atlantic_v5::MAX_PAYLOAD) * 2 + 2];
+  format_header_hex(dec_stats->last_unknown_header, hex);
+  // The payload is what actually identifies a new message, but it is only
+  // useful while someone is watching, so it rides on the raw_frame_dump switch
+  // rather than on a config key of its own.
+  if (this->raw_frame_dump_ && dec_stats->last_unknown_payload_len > 0) {
+    size_t n = ::atlantic_v5::HEADER_LEN * 2;
+    hex[n++] = ' ';
+    to_hex(dec_stats->last_unknown_payload, dec_stats->last_unknown_payload_len, hex + n);
+  }
   static_cast<text_sensor::TextSensor *>(obj)->publish_state(hex);
 }
 

@@ -8,6 +8,8 @@ namespace atlantic_v5 {
 
 static constexpr size_t MAX_FRAME = 32;  // 29 bytes observed on the wire, rounded up
 static constexpr size_t HEADER_LEN = 5;
+// What's left of MAX_FRAME after the header, the length byte and the CRC.
+static constexpr size_t MAX_PAYLOAD = MAX_FRAME - HEADER_LEN - 3;
 static constexpr uint32_t BAUD = 38400;
 
 // Payload length of the only rewritable frame (docs/protocol.md, control surface).

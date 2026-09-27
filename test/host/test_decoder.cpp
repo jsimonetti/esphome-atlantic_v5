@@ -205,21 +205,54 @@ int main() {
     // Firmware version text (0164006401): "2.9".
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_FIRMWARE_VERSION)->text, "2.9") == 0);
 
-    // Payload-less frames not in the catalogue, plus the HMI-origin write and
-    // its MAIN ack on 0165FEF901 (unknown meaning per 2.7): 4 unknown headers.
+    // Payload-less frames not in the mapped catalogue, plus the HMI-origin write
+    // and its MAIN ack on 0165FEF901: all four headers are in the *unmapped*
+    // table (docs/protocol.md), so they are routine traffic, not anomalies.
     // The 5 payload-less READ requests for known headers (FEB006, FEBA03,
     // FF1403, FEE203, 006401) are silently skipped, not counted as unknown or
     // as a length mismatch (plan 2.2: the request side of a READ carries no
     // payload by design, that's not an anomaly).
-    CHECK(decoder.stats().unknown_headers == 4);
+    CHECK(decoder.stats().unmapped_frames == 4);
+    CHECK(decoder.stats().unknown_headers == 0);
+    CHECK(decoder.stats().last_unknown_header == 0);
     CHECK(decoder.stats().length_mismatches == 0);
   }
   {
-    // --- last_unknown_header (plan 3.8's last_unknown_frame diagnostic):
-    // remembers the most recent header that fell through to the unknown case,
-    // as a raw uint64_t key ready for hex formatting by the caller. ---
-    // Header 0165FDF802 (unknown meaning per 2.7), no payload.
-    uint8_t frame[] = {0x01, 0x65, 0xFD, 0xF8, 0x02, 0, 0};
+    // --- A capture of nothing but unmapped traffic must leave the
+    // unknown-frame diagnostics completely untouched (ticket 11). ---
+    auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_unmapped_only.csv");
+    auto frames = assemble_capture(rows, /*dual_bus=*/true);
+    CHECK(frames.size() == rows.size());
+
+    atlantic_v5::Decoder decoder;
+    Collector all;
+    for (const auto &f : frames)
+      decoder.decode(f, collect, &all);
+
+    CHECK(all.values.empty());
+    CHECK(decoder.stats().unmapped_frames == frames.size());
+    CHECK(decoder.stats().unknown_headers == 0);
+    CHECK(decoder.stats().last_unknown_header == 0);
+    CHECK(decoder.stats().last_unknown_payload_len == 0);
+    CHECK(decoder.stats().length_mismatches == 0);
+  }
+  {
+    // --- is_unmapped_header: every key in the table is recognised, and a key
+    // in neither table is not. ---
+    for (size_t i = 0; i < atlantic_v5::header::UNMAPPED_COUNT; i++)
+      CHECK(atlantic_v5::is_unmapped_header(atlantic_v5::header::UNMAPPED[i]));
+    for (size_t i = 0; i < atlantic_v5::header::MAPPED_COUNT; i++)
+      CHECK(!atlantic_v5::is_unmapped_header(atlantic_v5::header::MAPPED[i]));
+    CHECK(!atlantic_v5::is_unmapped_header(0x0164DEAD01ULL));
+    CHECK(!atlantic_v5::is_unmapped_header(0));
+  }
+  {
+    // --- last_unknown_header/_payload (plan 3.8's last_unknown_frame
+    // diagnostic): remembers the most recent header that was in *neither*
+    // table, as a raw uint64_t key plus its payload, ready for hex formatting
+    // by the caller. ---
+    // Header 0164DEAD01: absent from docs/protocol.md entirely.
+    uint8_t frame[] = {0x01, 0x64, 0xDE, 0xAD, 0x01, 0x02, 0xBE, 0xEF, 0, 0};
     uint16_t crc = atlantic_v5::crc16_modbus(frame, sizeof(frame) - 2);
     frame[sizeof(frame) - 2] = static_cast<uint8_t>(crc & 0xFF);
     frame[sizeof(frame) - 1] = static_cast<uint8_t>((crc >> 8) & 0xFF);
@@ -233,7 +266,27 @@ int main() {
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
     CHECK(decoder.stats().unknown_headers == 1);
-    CHECK(decoder.stats().last_unknown_header == 0x0165FDF802ULL);
+    CHECK(decoder.stats().unmapped_frames == 0);
+    CHECK(decoder.stats().last_unknown_header == 0x0164DEAD01ULL);
+    CHECK(decoder.stats().last_unknown_payload_len == 2);
+    CHECK(decoder.stats().last_unknown_payload[0] == 0xBE);
+    CHECK(decoder.stats().last_unknown_payload[1] == 0xEF);
+  }
+  {
+    // A length byte that overruns what was actually buffered must not make the
+    // diagnostic read past the frame.
+    uint8_t frame[] = {0x01, 0x64, 0xDE, 0xAD, 0x01, 0xFF, 0xBE, 0, 0};
+    uint16_t crc = atlantic_v5::crc16_modbus(frame, sizeof(frame) - 2);
+    frame[sizeof(frame) - 2] = static_cast<uint8_t>(crc & 0xFF);
+    frame[sizeof(frame) - 1] = static_cast<uint8_t>((crc >> 8) & 0xFF);
+
+    atlantic_v5::Frame f(atlantic_v5::Channel::BUS, frame, sizeof(frame));
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(decoder.stats().unknown_headers == 1);
+    CHECK(decoder.stats().last_unknown_payload_len == 1);
+    CHECK(decoder.stats().last_unknown_payload[0] == 0xBE);
   }
   {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_single_bus_interleaved.csv");

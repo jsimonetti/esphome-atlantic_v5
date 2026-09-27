@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "frame.h"
+#include "types.h"
 
 namespace atlantic_v5 {
 
@@ -61,17 +62,26 @@ class Decoder {
   // Dispatches on f.header_key(). Never decodes a frame whose CRC failed (plan
   // 2.6). Validates payload length against the header's expected length before
   // decoding; a mismatch is counted (stats().length_mismatches) and the frame
-  // is skipped, never partially decoded. A header outside the catalogue counts
-  // as stats().unknown_headers and emits nothing (passthrough-and-count).
+  // is skipped, never partially decoded. A header in header::UNMAPPED counts as
+  // stats().unmapped_frames; one in neither table counts as
+  // stats().unknown_headers. Both emit nothing (passthrough-and-count).
   void decode(const Frame &f, Sink sink, void *ctx) const;
 
   struct Stats {
     uint32_t unknown_headers = 0;
+    // Known, expected traffic with no established meaning (CONTEXT.md). Rises
+    // forever on healthy hardware, so it is deliberately never published as an
+    // entity - it exists to keep unknown_headers meaningful.
+    uint32_t unmapped_frames = 0;
     uint32_t length_mismatches = 0;
     // The most recent header_key() that fell to the unknown-header case (plan
     // 3.8's last_unknown_frame diagnostic). 0 (never a valid header, byte 0 is
     // always 0x01) until the first unknown header is seen.
     uint64_t last_unknown_header = 0;
+    // That frame's payload, so the diagnostic can show what the unrecognised
+    // header carried and not just its key. 0-length for a payload-less frame.
+    uint8_t last_unknown_payload[MAX_PAYLOAD] = {};
+    uint8_t last_unknown_payload_len = 0;
   };
   const Stats &stats() const { return stats_; }
 
@@ -79,6 +89,7 @@ class Decoder {
   bool check_length(const Frame &f, uint8_t expected) const;
   void emit_minmax(const Frame &f, Sink sink, void *ctx, uint16_t min_id, uint16_t max_id) const;
   void emit_cycle(const Frame &f, Sink sink, void *ctx, uint16_t active_id, uint16_t count_id) const;
+  void record_unknown(const Frame &f) const;
 
   mutable Stats stats_;
 };

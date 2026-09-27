@@ -66,4 +66,18 @@ const char *entity_name(EntityId id) {
   return id < ENT_COUNT ? NAMES[id] : "unknown";
 }
 
+bool is_unmapped_header(uint64_t key) {
+  size_t lo = 0, hi = header::UNMAPPED_COUNT;
+  while (lo < hi) {
+    size_t mid = lo + (hi - lo) / 2;
+    if (header::UNMAPPED[mid] == key)
+      return true;
+    if (header::UNMAPPED[mid] < key)
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+  return false;
+}
+
 }  // namespace atlantic_v5

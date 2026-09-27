@@ -210,11 +210,16 @@ switch:
 
 `frames_ok`/`crc_errors`/`resyncs`/`dropped_bytes` are per-side totals in
 `mitm` mode (HMI + MAIN assemblers summed) and single-assembler totals in
-`listener` mode. `unknown_frames` counts frames whose header isn't in the
-message catalogue at all (still forwarded/logged, never decoded);
+`listener` mode. `unknown_frames` counts frames whose header appears in
+neither table of [`docs/protocol.md`](docs/protocol.md)'s message catalogue —
+traffic this component has never seen before (still forwarded/logged, never
+decoded). Headers in the catalogue's *Unmapped messages* table are known,
+routine traffic with no established meaning; they are not counted here and
+are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
 `last_unknown_frame` publishes the most recent such header as hex
-(e.g. `0165FDF802`) so it can be looked up against Part 2 of the
-implementation plan or reported upstream.
+(e.g. `0164DEAD01`) so it can be reported upstream; with the
+`raw_frame_dump` switch on, the frame's payload hex is appended after a
+space (e.g. `0164DEAD01 BEEF`).
 
 ### `raw_frame_dump` vs `bus_capture`
 

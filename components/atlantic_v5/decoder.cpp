@@ -118,6 +118,18 @@ void Decoder::emit_cycle(const Frame &f, Sink sink, void *ctx, uint16_t active_i
   emit_uint(sink, ctx, count_id, c.count);
 }
 
+void Decoder::record_unknown(const Frame &f) const {
+  stats_.unknown_headers++;
+  stats_.last_unknown_header = f.header_key();
+  // payload_len() is a wire byte: a CRC-valid frame can still claim more than
+  // was actually buffered, so clamp to what the frame really holds.
+  uint8_t buffered = f.has_payload() ? static_cast<uint8_t>(f.raw_len() - (HEADER_LEN + 3)) : 0;
+  uint8_t len = f.payload_len() < buffered ? f.payload_len() : buffered;
+  stats_.last_unknown_payload_len = len;
+  if (len > 0)
+    std::memcpy(stats_.last_unknown_payload, f.payload(), len);
+}
+
 void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
   if (!f.crc_valid())
     return;  // plan 2.6: never decode a frame whose CRC failed
@@ -234,8 +246,10 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
       break;
     }
     default:
-      stats_.unknown_headers++;
-      stats_.last_unknown_header = f.header_key();
+      if (is_unmapped_header(f.header_key()))
+        stats_.unmapped_frames++;
+      else
+        record_unknown(f);
       break;
   }
 }
