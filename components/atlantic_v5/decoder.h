@@ -85,7 +85,8 @@ class Decoder {
     uint32_t text_length_variants = 0;
     // The most recent frame that hit either of the two counters above, so the
     // operator-facing diagnostic can name the header instead of just a tally.
-    // 0 (never a valid header, byte 0 is always 0x01) until the first one.
+    // _actual is the payload bytes the frame really offered, which is not always
+    // the length it declared. 0 (never a valid header) until the first one.
     uint64_t last_length_anomaly_header = 0;
     uint8_t last_length_anomaly_expected = 0;
     uint8_t last_length_anomaly_actual = 0;

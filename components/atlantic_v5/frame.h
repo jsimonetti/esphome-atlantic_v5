@@ -30,8 +30,9 @@ class Frame {
   // False for anything shorter than a minimal CRC-terminated frame.
   bool crc_valid() const;
 
-  // Replaces payload_len() bytes at the payload offset and recomputes/rewrites the
-  // trailing little-endian CRC. Caller guarantees src holds exactly payload_len() bytes.
+  // Replaces the frame's payload bytes and recomputes/rewrites the trailing
+  // little-endian CRC. Writes min(payload_len(), buffered_payload_len()) bytes;
+  // caller guarantees src holds at least that many.
   void replace_payload(const uint8_t *src);
 
   bool modified() const { return modified_; }

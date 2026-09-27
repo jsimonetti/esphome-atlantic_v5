@@ -151,7 +151,10 @@ enforced exactly; a disagreement there rejects the frame and increments
 
 Always validate a payload before decoding it: against the header's expected
 length for every fixed-offset codec, structurally for `text` as described above.
-Never decode a frame whose CRC failed.
+The length byte is a raw wire value, so in both cases the frame must also
+actually carry the bytes it claims — the silence backstop can close a frame
+early, and a codec reading past what arrived would publish buffer contents as
+fact. Never decode a frame whose CRC failed.
 
 ## Message catalogue
 

@@ -562,5 +562,25 @@ int main() {
     CHECK(hmi_io.writes_.size() == 1);
   }
 
+  // --- The rewrite hook reads payload byte 2 and writes three bytes back, so a
+  // control frame that *declares* three payload bytes but was closed before
+  // carrying them must be left alone and forwarded verbatim. The silence
+  // backstop (assembler tick) can deliver exactly such a frame. ---
+  {
+    RelayPolicy policy;
+    policy.set_control_mode(atlantic_v5::ControlMode::BOOST);
+
+    std::vector<uint8_t> raw{0x01, 0x64, 0xFF, 0x14, 0x03, 0x03, 0x00, 0x00, 0x00};  // declares 3, carries 1
+    append_crc(raw);
+    Frame f(Channel::MAIN, raw.data(), static_cast<uint8_t>(raw.size()));
+    CHECK(f.crc_valid());
+    CHECK(f.payload_len() == 3);
+    CHECK(f.buffered_payload_len() == 1);
+
+    CHECK(!policy.apply(f));
+    CHECK(!f.modified());
+    CHECK(std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()) == raw);
+  }
+
   TEST_MAIN_RETURN();
 }

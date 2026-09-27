@@ -5,7 +5,9 @@ namespace atlantic_v5 {
 bool RelayPolicy::apply(Frame &f) const {
   if (f.header_key() != INPUT_STATUS_HEADER_KEY)
     return false;
-  if (f.payload_len() != INPUT_STATUS_PAYLOAD_LEN)
+  // Declared *and* present: payload()[2] is read below, and a frame closed
+  // early by the silence backstop can claim bytes it never carried.
+  if (f.payload_len() != INPUT_STATUS_PAYLOAD_LEN || f.buffered_payload_len() < INPUT_STATUS_PAYLOAD_LEN)
     return false;
   if (!f.crc_valid())
     return false;

@@ -289,7 +289,7 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     char hex[::atlantic_v5::HEADER_LEN * 2 + 1];
     format_header_hex(dec_stats->last_length_anomaly_header, hex);
     ESP_LOGW(TAG,
-             "payload length anomaly on header %s: catalogue expects %u, frame declared %u "
+             "payload length anomaly on header %s: catalogue expects %u, frame offers %u "
              "(rejected %" PRIu32 ", published with unexpected width %" PRIu32 ")",
              hex, dec_stats->last_length_anomaly_expected, dec_stats->last_length_anomaly_actual,
              dec_stats->length_mismatches, dec_stats->text_length_variants);

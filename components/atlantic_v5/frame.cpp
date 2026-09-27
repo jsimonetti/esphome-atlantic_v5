@@ -46,7 +46,11 @@ bool Frame::crc_valid() const {
 void Frame::replace_payload(const uint8_t *src) {
   if (len_ < 2)
     return;
-  uint8_t n = payload_len();
+  // payload_len() is a wire byte and can claim more than buf_ holds; writing
+  // that many bytes at PAYLOAD_OFFSET would run off the end of the frame.
+  uint8_t declared = payload_len();
+  uint8_t buffered = buffered_payload_len();
+  uint8_t n = declared < buffered ? declared : buffered;
   if (n > 0)
     std::memcpy(buf_ + PAYLOAD_OFFSET, src, n);
   uint16_t crc = crc16_modbus(buf_, len_ - 2);

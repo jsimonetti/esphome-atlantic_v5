@@ -85,6 +85,15 @@ void emit_text(Decoder::Sink sink, void *ctx, uint16_t id, const char *text) {
   sink(ctx, v);
 }
 
+// The payload bytes a codec can actually read: the declared length clamped to
+// what the frame carried. payload_len() is a raw wire byte, so a CRC-valid
+// frame closed early by the silence backstop can claim more than it holds.
+uint8_t usable_payload_len(const Frame &f) {
+  uint8_t declared = f.payload_len();
+  uint8_t buffered = f.buffered_payload_len();
+  return declared < buffered ? declared : buffered;
+}
+
 }  // namespace
 
 // A known header with no payload is the request/ack side of a READ/WRITE
@@ -93,9 +102,12 @@ void emit_text(Decoder::Sink sink, void *ctx, uint16_t id, const char *text) {
 bool Decoder::check_length(const Frame &f, uint8_t expected) const {
   if (!f.has_payload())
     return false;
-  if (f.payload_len() != expected) {
+  // The catalogued length must both be declared and actually be present: a
+  // fixed-offset codec reading past what the frame carried would publish
+  // uninitialised buffer contents as a measurement.
+  if (f.payload_len() != expected || f.buffered_payload_len() < expected) {
     stats_.length_mismatches++;
-    record_length_anomaly(f, expected, f.payload_len());
+    record_length_anomaly(f, expected, usable_payload_len(f));
     return false;
   }
   return true;
@@ -121,7 +133,7 @@ bool Decoder::check_text_length(const Frame &f, uint8_t expected, uint8_t *len_o
   uint8_t declared = f.payload_len();
   if (declared > f.buffered_payload_len() || declared > sizeof(DecodedValue::text) - 1) {
     stats_.length_mismatches++;
-    record_length_anomaly(f, expected, declared);
+    record_length_anomaly(f, expected, usable_payload_len(f));
     return false;
   }
   *len_out = declared;
@@ -169,8 +181,7 @@ void Decoder::emit_cycle(const Frame &f, Sink sink, void *ctx, uint16_t active_i
 void Decoder::record_unknown(const Frame &f) const {
   stats_.unknown_headers++;
   stats_.last_unknown_header = f.header_key();
-  uint8_t buffered = f.buffered_payload_len();
-  uint8_t len = f.payload_len() < buffered ? f.payload_len() : buffered;
+  uint8_t len = usable_payload_len(f);
   stats_.last_unknown_payload_len = len;
   if (len > 0)
     std::memcpy(stats_.last_unknown_payload, f.payload(), len);

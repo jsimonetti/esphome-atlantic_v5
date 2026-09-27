@@ -490,6 +490,30 @@ int main() {
     CHECK(decoder.stats().last_length_anomaly_expected == 2);
     CHECK(decoder.stats().last_length_anomaly_actual == 3);
   }
+  {
+    // A fixed-offset codec must also refuse a frame that declares the
+    // catalogued length but was closed before carrying it (the silence
+    // backstop can deliver one). Decoding it would publish uninitialised
+    // buffer bytes as a temperature.
+    uint8_t frame[] = {0x01, 0x64, 0xFE, 0xBA, 0x03, 0x05, 0x00, 0x01, 0x2C, 0x00, 0x00};
+    uint16_t crc = atlantic_v5::crc16_modbus(frame, sizeof(frame) - 2);
+    frame[sizeof(frame) - 2] = static_cast<uint8_t>(crc & 0xFF);
+    frame[sizeof(frame) - 1] = static_cast<uint8_t>((crc >> 8) & 0xFF);
+
+    atlantic_v5::Frame f(atlantic_v5::Channel::BUS, frame, sizeof(frame));
+    CHECK(f.crc_valid());
+    CHECK(f.payload_len() == 5);            // water_temperature_minmax's catalogue length
+    CHECK(f.buffered_payload_len() == 3);   // but only 3 bytes are actually there
+
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.empty());
+    CHECK(decoder.stats().length_mismatches == 1);
+    CHECK(decoder.stats().last_length_anomaly_header == atlantic_v5::header::WATER_TEMPERATURE_MINMAX);
+    CHECK(decoder.stats().last_length_anomaly_expected == 5);
+    CHECK(decoder.stats().last_length_anomaly_actual == 3);
+  }
 
   // --- The seven mapped headers that appear in no capture fixture (ticket 14):
   // compressor_outlet / air_inlet / evaporator_3 minmax, and cycles 3-6. Frames
