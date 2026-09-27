@@ -6,3 +6,12 @@ requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 dependencies = ["esphome"]
+
+[tool.uv]
+# Intel macOS excluded: esphome pins cryptography==48.0.1 there (no 49+ wheels),
+# which drags a known-vulnerable version into the lock for a platform we never build on.
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'win32'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
