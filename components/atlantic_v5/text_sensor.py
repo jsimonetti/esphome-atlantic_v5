@@ -17,6 +17,12 @@ TEXT_SENSORS = {
     "controller_model": "ENT_CONTROLLER_MODEL",
     "hmi_version": "ENT_HMI_VERSION",
     "hmi_model": "ENT_HMI_MODEL",
+    # Diagnostics (plan 3.8), off by default.
+    "last_unknown_frame": "ENT_LAST_UNKNOWN_FRAME",
+    "last_frame_dump": "ENT_LAST_FRAME_DUMP",
+    # Startup self-test result (plan 3.5.4 #3), mitm-only; never published in
+    # listener mode (RelayTask doesn't exist there).
+    "self_test_result": "ENT_SELF_TEST_RESULT",
 }
 
 CONFIG_SCHEMA = cv.Schema(

@@ -25,6 +25,8 @@ void Listener::handle_frame(uint32_t t_us) {
     return;
   if (f.has_payload() && (f.header_key() & TXN_MASK) == TXN_READ)
     last_main_us_ = t_us;
+  if (frame_sink_ != nullptr)
+    frame_sink_(frame_ctx_, f, t_us);
   if (sink_ != nullptr)
     decoder_.decode(f, sink_, ctx_);
 }

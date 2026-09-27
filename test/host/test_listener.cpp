@@ -1,6 +1,7 @@
 // M4 host test (ticket 07): Listener (listener.{h,cpp}) - single-bus
 // assembly + decode + the MAIN-quiet staleness gate, independent of ESPHome.
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "catalog.h"
@@ -116,6 +117,38 @@ int main() {
     l.tick(atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US);
 
     CHECK(l.assembler_stats().silence_closes == 1);
+  }
+
+  // --- set_frame_sink (plan 3.8's raw_frame_dump): fired once per complete,
+  // CRC-valid frame with the frame itself, independent of whether the header
+  // is in Decoder's catalogue - never fired for a bad-CRC frame. ---
+  {
+    Listener l;
+    std::vector<uint8_t> seen;
+    uint32_t seen_t_us = 0;
+
+    // set_frame_sink's ctx is opaque to Listener; route through a small pair
+    // instead of a capturing lambda (the sink type is a plain function pointer).
+    std::pair<std::vector<uint8_t> *, uint32_t *> ctx{&seen, &seen_t_us};
+    l.set_frame_sink(
+        [](void *raw_ctx, const atlantic_v5::Frame &f, uint32_t t_us) {
+          auto *c = static_cast<std::pair<std::vector<uint8_t> *, uint32_t *> *>(raw_ctx);
+          c->first->assign(f.raw(), f.raw() + f.raw_len());
+          *c->second = t_us;
+        },
+        &ctx);
+
+    auto frame = build_frame({0x01, 0x64, 0x14, 0xB7, 0x01, 0x02, 0x11, 0xC6});
+    feed(l, frame, 2'000'000);
+    CHECK(seen == frame);
+    CHECK(seen_t_us == 2'000'000);
+
+    // A bad-CRC frame never reaches the sink (fail-safe discard, 2.5.2 #4).
+    seen.clear();
+    auto bad = build_frame({0x01, 0x64, 0x14, 0xB7, 0x01, 0x02, 0x11, 0xC6});
+    bad[bad.size() - 1] ^= 0xFF;
+    feed(l, bad, 3'000'000);
+    CHECK(seen.empty());
   }
 
   TEST_MAIN_RETURN();

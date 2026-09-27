@@ -194,6 +194,83 @@ int main() {
     CHECK(found);
   }
 
+  // --- Ticket 09: changing the control_mode select (RelayPolicy::set_control_mode,
+  // wired from AtlanticV5Select::control()) changes the bytes the rewrite hook
+  // emits, exactly per plan 2.8's table — the host-side stand-in for the
+  // hardware loopback test this ticket's acceptance box refers to. Byte 2
+  // (heating status, 0x01 in the capture) is always copied through regardless
+  // of mode, and passthrough must leave the frame - and the rewrite counter -
+  // untouched. ---
+  {
+    struct Case {
+      atlantic_v5::ControlMode mode;
+      uint8_t i2, i1;
+      bool expect_rewrite;
+    };
+    const Case cases[] = {
+        {atlantic_v5::ControlMode::PASSTHROUGH, 0x00, 0x01, false},  // original bytes, untouched
+        {atlantic_v5::ControlMode::NORMAL, 0x00, 0x00, true},
+        {atlantic_v5::ControlMode::EAGER, 0x00, 0x01, true},
+        {atlantic_v5::ControlMode::OFF, 0x01, 0x00, true},
+        {atlantic_v5::ControlMode::BOOST, 0x01, 0x01, true},
+    };
+
+    for (const auto &c : cases) {
+      auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
+      MockBusIo hmi_io, main_io;
+      RelayPolicy policy;
+      policy.set_control_mode(c.mode);
+      Relay relay(hmi_io, main_io, policy);
+
+      for (const auto &row : rows) {
+        (row.channel == Channel::HMI ? hmi_io : main_io).queue(row.t_us, row.bytes);
+        hmi_io.set_now(row.t_us);
+        main_io.set_now(row.t_us);
+        relay.poll(row.t_us);
+      }
+
+      CHECK(relay.stats().rewrites_applied == (c.expect_rewrite ? 1u : 0u));
+
+      std::vector<uint8_t> expected = {0x01, 0x64, 0xFF, 0x14, 0x03, 0x03, c.i2, c.i1, 0x01, 0, 0};
+      append_crc(expected);
+
+      bool found = false;
+      for (const auto &w : hmi_io.writes_) {
+        if (w.size() >= 5 && w[0] == 0x01 && w[1] == 0x64 && w[2] == 0xFF && w[3] == 0x14 && w[4] == 0x03) {
+          CHECK(w == expected);
+          found = true;
+        }
+      }
+      CHECK(found);
+    }
+  }
+
+  // --- reset_latency_stats (plan 3.8: relay_latency_avg_us/max_us are "reset
+  // on read"): zeroes only the latency fields, leaving the plain cumulative
+  // counters (frames_relayed, rewrites_applied, echo_bytes) untouched. ---
+  {
+    auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;
+    Relay relay(hmi_io, main_io, policy);
+
+    for (const auto &row : rows) {
+      (row.channel == Channel::HMI ? hmi_io : main_io).queue(row.t_us, row.bytes);
+      hmi_io.set_now(row.t_us);
+      main_io.set_now(row.t_us);
+      relay.poll(row.t_us);
+    }
+    CHECK(relay.stats().latency_samples == rows.size());
+    uint32_t frames_relayed_before = relay.stats().frames_relayed;
+
+    relay.reset_latency_stats();
+
+    CHECK(relay.stats().latency_samples == 0);
+    CHECK(relay.stats().latency_max_us == 0);
+    CHECK(relay.stats().latency_total_us == 0);
+    CHECK(relay.stats().frames_relayed == frames_relayed_before);  // untouched
+  }
+
   // --- Fail-safe forwarding (plan 3.9 #2 / 2.5.1): a frame with a bad CRC is
   // still forwarded raw and unmodified — the rewrite hook must never touch it,
   // and the error is counted, not silently dropped. ---

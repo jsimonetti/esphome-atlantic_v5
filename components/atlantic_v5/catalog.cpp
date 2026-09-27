@@ -44,6 +44,21 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "heating_active",
     "hmi_version",
     "hmi_model",
+    "frames_ok",
+    "crc_errors",
+    "resyncs",
+    "dropped_bytes",
+    "unknown_frames",
+    "frames_relayed",
+    "rewrites_applied",
+    "echo_bytes",
+    "queue_overflows",
+    "relay_latency_max_us",
+    "relay_latency_avg_us",
+    "task_stack_free",
+    "last_unknown_frame",
+    "last_frame_dump",
+    "self_test_result",
 };
 }  // namespace
 

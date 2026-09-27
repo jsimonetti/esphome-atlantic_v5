@@ -77,6 +77,16 @@ sensor:
       name: DHW cycle 5 count
     cycle_6_count:
       name: DHW cycle 6 count
+    frames_ok:
+      name: DHW frames ok
+    crc_errors:
+      name: DHW CRC errors
+    resyncs:
+      name: DHW resyncs
+    dropped_bytes:
+      name: DHW dropped bytes
+    unknown_frames:
+      name: DHW unknown frames
 
 binary_sensor:
   - platform: atlantic_v5
@@ -113,3 +123,12 @@ text_sensor:
       name: DHW HMI version
     hmi_model:
       name: DHW HMI model
+    last_unknown_frame:
+      name: DHW last unknown frame
+    last_frame_dump:
+      name: DHW last frame dump
+
+switch:
+  - platform: atlantic_v5
+    raw_frame_dump:
+      name: DHW raw frame dump

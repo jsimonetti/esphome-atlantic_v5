@@ -43,6 +43,16 @@ class RelayTask {
 
   const Relay::Stats &stats() const { return this->relay_.stats(); }
   uint32_t queue_overflows() const { return this->queue_overflows_; }
+  const FrameAssembler::Stats &hmi_stats() const { return this->relay_.hmi_stats(); }
+  const FrameAssembler::Stats &main_stats() const { return this->relay_.main_stats(); }
+  void reset_latency_stats() { this->relay_.reset_latency_stats(); }
+
+  // High-water mark of unused stack, in bytes, for the diagnostic in plan 3.6.3
+  // ("measure with uxTaskGetStackHighWaterMark"). 0 before begin() spawns the task.
+  uint32_t stack_high_water_mark() const {
+    return this->handle_ != nullptr ? static_cast<uint32_t>(uxTaskGetStackHighWaterMark(this->handle_)) * sizeof(StackType_t)
+                                     : 0;
+  }
 
   // Result of the startup self-test (3.5.4), for a diagnostic text sensor and a
   // one-time log line; never gates whether the relay task itself starts.

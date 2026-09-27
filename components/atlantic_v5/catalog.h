@@ -8,7 +8,9 @@
 namespace atlantic_v5 {
 
 // Index into L3's entity table (plan 3.3). Order mirrors the message catalogue
-// (plan 2.7), payload-bearing frames with known meaning only.
+// (plan 2.7), payload-bearing frames with known meaning only, plus a block of
+// diagnostic counters (plan 3.8) appended at the end - not part of the wire
+// catalogue, but published through the same entity-id/publish plumbing.
 enum EntityId : uint16_t {
   ENT_FIRMWARE_VERSION = 0,
   ENT_SERIAL_NUMBER,
@@ -50,6 +52,25 @@ enum EntityId : uint16_t {
   ENT_HEATING_ACTIVE,
   ENT_HMI_VERSION,
   ENT_HMI_MODEL,
+
+  // Diagnostics (plan 3.8), off by default; frames_ok/crc_errors/resyncs/
+  // dropped_bytes/unknown_frames are per-side totals in mitm, single-assembler
+  // totals in listener (ticket 09, see build-and-tooling notes).
+  ENT_FRAMES_OK,
+  ENT_CRC_ERRORS,
+  ENT_RESYNCS,
+  ENT_DROPPED_BYTES,
+  ENT_UNKNOWN_FRAMES,
+  ENT_FRAMES_RELAYED,
+  ENT_REWRITES_APPLIED,
+  ENT_ECHO_BYTES,
+  ENT_QUEUE_OVERFLOWS,
+  ENT_RELAY_LATENCY_MAX_US,
+  ENT_RELAY_LATENCY_AVG_US,
+  ENT_TASK_STACK_FREE,
+  ENT_LAST_UNKNOWN_FRAME,
+  ENT_LAST_FRAME_DUMP,
+  ENT_SELF_TEST_RESULT,
   ENT_COUNT
 };
 

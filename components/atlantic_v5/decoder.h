@@ -68,6 +68,10 @@ class Decoder {
   struct Stats {
     uint32_t unknown_headers = 0;
     uint32_t length_mismatches = 0;
+    // The most recent header_key() that fell to the unknown-header case (plan
+    // 3.8's last_unknown_frame diagnostic). 0 (never a valid header, byte 0 is
+    // always 0x01) until the first unknown header is seen.
+    uint64_t last_unknown_header = 0;
   };
   const Stats &stats() const { return stats_; }
 

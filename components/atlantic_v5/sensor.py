@@ -30,6 +30,14 @@ def _count_schema():
     return sensor.sensor_schema(accuracy_decimals=0, entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
 
 
+def _us_schema():
+    return sensor.sensor_schema(
+        unit_of_measurement="us",
+        accuracy_decimals=0,
+        entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+    )
+
+
 # key (also the message catalogue's Entity name, plan 2.7) -> (EntityId enum
 # member name in core/catalog.h, schema). Kept in this order so it's easy to
 # eyeball against catalog.h's EntityId; see build-and-tooling notes on keeping
@@ -60,6 +68,22 @@ SENSORS = {
     "cycle_4_count": ("ENT_CYCLE_4_COUNT", _count_schema()),
     "cycle_5_count": ("ENT_CYCLE_5_COUNT", _count_schema()),
     "cycle_6_count": ("ENT_CYCLE_6_COUNT", _count_schema()),
+    # Diagnostics (plan 3.8), off by default: frames_ok/crc_errors/resyncs/
+    # dropped_bytes are per-side totals in mitm mode, single-assembler totals
+    # in listener mode (see AtlanticV5Component::update_diagnostics).
+    "frames_ok": ("ENT_FRAMES_OK", _count_schema()),
+    "crc_errors": ("ENT_CRC_ERRORS", _count_schema()),
+    "resyncs": ("ENT_RESYNCS", _count_schema()),
+    "dropped_bytes": ("ENT_DROPPED_BYTES", _count_schema()),
+    "unknown_frames": ("ENT_UNKNOWN_FRAMES", _count_schema()),
+    # mitm-only; stay at 0 in listener mode (no Relay/RelayTask there).
+    "frames_relayed": ("ENT_FRAMES_RELAYED", _count_schema()),
+    "rewrites_applied": ("ENT_REWRITES_APPLIED", _count_schema()),
+    "echo_bytes": ("ENT_ECHO_BYTES", _count_schema()),
+    "queue_overflows": ("ENT_QUEUE_OVERFLOWS", _count_schema()),
+    "relay_latency_max_us": ("ENT_RELAY_LATENCY_MAX_US", _us_schema()),
+    "relay_latency_avg_us": ("ENT_RELAY_LATENCY_AVG_US", _us_schema()),
+    "task_stack_free": ("ENT_TASK_STACK_FREE", _count_schema()),
 }
 
 CONFIG_SCHEMA = cv.Schema(

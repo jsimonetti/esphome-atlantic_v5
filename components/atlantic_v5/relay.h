@@ -63,6 +63,17 @@ class Relay {
     uint32_t latency_samples = 0;
   };
   const Stats &stats() const { return stats_; }
+
+  // plan 3.8: relay_latency_avg_us/max_us are "reset on read or on an hourly
+  // window" - the diagnostics publish cycle calls this right after reading, so
+  // each published value covers "since the last read", not "since boot".
+  // frames_relayed/rewrites_applied/echo_bytes are plain cumulative counters
+  // and are never reset.
+  void reset_latency_stats() {
+    stats_.latency_max_us = 0;
+    stats_.latency_total_us = 0;
+    stats_.latency_samples = 0;
+  }
   const FrameAssembler::Stats &hmi_stats() const { return hmi_.asm_.stats(); }
   const FrameAssembler::Stats &main_stats() const { return main_.asm_.stats(); }
 

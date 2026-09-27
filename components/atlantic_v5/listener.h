@@ -8,6 +8,7 @@
 
 #include "assembler.h"
 #include "decoder.h"
+#include "frame.h"
 #include "types.h"
 
 namespace atlantic_v5 {
@@ -19,6 +20,16 @@ class Listener {
   void set_sink(Sink sink, void *ctx) {
     sink_ = sink;
     ctx_ = ctx;
+  }
+
+  // Raw already-framed, CRC-valid frame hook (plan 3.8's raw_frame_dump),
+  // fired for every complete frame regardless of whether Decoder recognises
+  // its header - mirrors Relay::FrameSink (ticket 08) so both modes share the
+  // same "who gets to see a completed frame" shape.
+  using FrameSink = void (*)(void *ctx, const Frame &f, uint32_t t_us);
+  void set_frame_sink(FrameSink sink, void *ctx) {
+    frame_sink_ = sink;
+    frame_ctx_ = ctx;
   }
 
   // Feeds one byte from the tapped bus. Decodes and publishes through the sink
@@ -48,6 +59,8 @@ class Listener {
   uint32_t last_main_us_ = 0;
   Sink sink_ = nullptr;
   void *ctx_ = nullptr;
+  FrameSink frame_sink_ = nullptr;
+  void *frame_ctx_ = nullptr;
 };
 
 }  // namespace atlantic_v5

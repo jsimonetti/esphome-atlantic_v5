@@ -215,6 +215,27 @@ int main() {
     CHECK(decoder.stats().length_mismatches == 0);
   }
   {
+    // --- last_unknown_header (plan 3.8's last_unknown_frame diagnostic):
+    // remembers the most recent header that fell through to the unknown case,
+    // as a raw uint64_t key ready for hex formatting by the caller. ---
+    // Header 0165FDF802 (unknown meaning per 2.7), no payload.
+    uint8_t frame[] = {0x01, 0x65, 0xFD, 0xF8, 0x02, 0, 0};
+    uint16_t crc = atlantic_v5::crc16_modbus(frame, sizeof(frame) - 2);
+    frame[sizeof(frame) - 2] = static_cast<uint8_t>(crc & 0xFF);
+    frame[sizeof(frame) - 1] = static_cast<uint8_t>((crc >> 8) & 0xFF);
+
+    atlantic_v5::Frame f(atlantic_v5::Channel::BUS, frame, sizeof(frame));
+    CHECK(f.crc_valid());
+
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    CHECK(decoder.stats().last_unknown_header == 0);
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.empty());
+    CHECK(decoder.stats().unknown_headers == 1);
+    CHECK(decoder.stats().last_unknown_header == 0x0165FDF802ULL);
+  }
+  {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_single_bus_interleaved.csv");
     auto frames = assemble_capture(rows, /*dual_bus=*/false);
 

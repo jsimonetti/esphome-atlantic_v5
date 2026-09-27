@@ -35,7 +35,8 @@ enum class Mode : uint8_t { LISTENER, MITM };
 
 // Which ESPHome platform an entities_[] slot holds (plan 3.7.1/3.7.3). Only
 // read-only entities register through this generic path (ADR 0001); the
-// select is controllable and gets its own dedicated class at ticket 09.
+// control_mode select and raw_frame_dump switch are controllable and get
+// their own dedicated classes (atlantic_v5_select.h, atlantic_v5_switch.h).
 enum class EntityKind : uint8_t { SENSOR, BINARY_SENSOR, TEXT_SENSOR };
 
 class AtlanticV5Component : public Component {
@@ -60,6 +61,15 @@ class AtlanticV5Component : public Component {
   // outlive this component; kind selects which publish_state overload to call.
   void set_entity(uint16_t id, void *obj, EntityKind kind);
 
+  // The control_mode select's write path (plan 2.8/3.4): writes into policy_,
+  // which only Relay (mitm-only) ever reads, so it has no effect in listener
+  // mode - unreachable anyway, since select.py rejects control_mode there.
+  void set_control_mode(::atlantic_v5::ControlMode mode);
+
+  // The raw_frame_dump switch's write path (plan 3.8): gates whether
+  // already-framed, already-decoded frames get hex-dumped to a text sensor.
+  void set_raw_frame_dump(bool enabled) { this->raw_frame_dump_ = enabled; }
+
   void setup() override;
   void loop() override;
   void dump_config() override;
@@ -81,6 +91,19 @@ class AtlanticV5Component : public Component {
   void loop_mitm();
   static void capture_sink_trampoline(void *ctx, ::atlantic_v5::Channel channel, const uint8_t *data, size_t len,
                                        uint32_t t_us);
+
+  // Diagnostic counters (plan 3.8), rate-limited to once/second; source stats
+  // differ by mode (RelayTask/Relay/FrameAssembler in mitm, Listener in
+  // listener), published through the same dedup'd publish() as decoded values.
+  void update_diagnostics(uint32_t now_us);
+  void publish_diag_uint(uint16_t id, uint32_t value);
+  void publish_diag_float(uint16_t id, float value);
+
+  // raw_frame_dump (plan 3.8): fired for every already-framed, CRC-valid frame
+  // in both modes - directly from loop_mitm()'s decoded FrameEvents, and via
+  // Listener::FrameSink in listener mode (frame_dump_trampoline).
+  void maybe_dump_frame(const ::atlantic_v5::Frame &f, uint32_t t_us);
+  static void frame_dump_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
 
   // Per-side MITM config (plan 3.7.2); unused in listener mode.
   struct SideConfig {
@@ -106,9 +129,15 @@ class AtlanticV5Component : public Component {
   BusCaptureLogger *hmi_capture_logger_{nullptr};
   BusCaptureLogger *main_capture_logger_{nullptr};
   BusCaptureLogger capture_logger_{"bus"};  // listener mode's single tapped wire
+
+  uint32_t last_diag_us_{0};
+  uint32_t last_unknown_frame_us_{0};
+  uint32_t last_unknown_headers_seen_{0};
+  uint32_t last_frame_dump_us_{0};
 #endif
   Mode mode_{Mode::LISTENER};
   bool bus_capture_{false};
+  bool raw_frame_dump_{false};
   int uart_num_{1};
   int rx_pin_{-1};
   int tx_pin_{-1};

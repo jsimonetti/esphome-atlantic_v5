@@ -235,6 +235,7 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
     }
     default:
       stats_.unknown_headers++;
+      stats_.last_unknown_header = f.header_key();
       break;
   }
 }
