@@ -1,6 +1,8 @@
 #include "atlantic_v5.h"
 #include "esphome/core/log.h"
 
+#include <cstring>
+
 #ifdef USE_ESP32
 #include <esp_timer.h>
 #endif
@@ -13,7 +15,8 @@ static const char *const CAPTURE_TAG = "atlantic_v5.bus_capture";
 
 #ifdef USE_ESP32
 namespace {
-constexpr size_t CAPTURE_CHUNK_LEN = 32;  // matches the documented max frame size
+// Plan 2.1/2.5.1: primary framing is length-driven, this is only the backstop.
+constexpr int64_t CAPTURE_SILENCE_US = 4000;
 
 // Uppercase hex, no separators, matching the test/captures/*.csv hex column.
 void to_hex(const uint8_t *data, size_t len, char *out) {
@@ -65,19 +68,48 @@ void AtlanticV5Component::loop() {
   if (this->mode_ != Mode::LISTENER || !this->bus_capture_ || this->is_failed())
     return;
 
-  uint8_t buf[CAPTURE_CHUNK_LEN];
+  uint8_t chunk[CAPTURE_BUF_LEN];
   // Non-blocking poll: framing/decoding (M1-M3) will replace this with the
   // FrameAssembler; bus_capture only needs "whatever arrived since last loop()".
-  int len = uart_read_bytes(this->port_, buf, sizeof(buf), 0);
-  if (len <= 0)
+  int len = uart_read_bytes(this->port_, chunk, sizeof(chunk), 0);
+  int64_t now_us = esp_timer_get_time();
+
+  auto flush = [&](int64_t t_us) {
+    // Approximates the "last byte received" convention (2.1/3.2): timestamped
+    // after the read, not per-byte. Good enough for harvesting, not for timing.
+    char hex[CAPTURE_BUF_LEN * 2 + 1];
+    to_hex(this->capture_buf_, this->capture_len_, hex);
+    ESP_LOGI(CAPTURE_TAG, "BUSCAP,%lld,bus,%s", static_cast<long long>(t_us), hex);
+    this->capture_len_ = 0;
+  };
+
+  // Accumulate rather than logging immediately: frames are variable-length
+  // (5-byte header + optional length-driven payload, plan 2.3), so there's no
+  // fixed size to read in one shot. Only flush early (mid-chunk) if the
+  // buffer would otherwise overflow, so bytes are never dropped.
+  size_t offset = 0;
+  while (offset < static_cast<size_t>(len)) {
+    if (this->capture_len_ >= sizeof(this->capture_buf_))
+      flush(now_us);
+    size_t space = sizeof(this->capture_buf_) - this->capture_len_;
+    size_t remaining = static_cast<size_t>(len) - offset;
+    size_t copy_len = remaining < space ? remaining : space;
+    memcpy(this->capture_buf_ + this->capture_len_, chunk + offset, copy_len);
+    this->capture_len_ += copy_len;
+    offset += copy_len;
+  }
+  if (len > 0)
+    this->capture_last_byte_us_ = now_us;
+
+  if (this->capture_len_ == 0)
     return;
 
-  // Approximates the "last byte received" convention (2.1/3.2): timestamped
-  // after the read, not per-byte. Good enough for harvesting, not for timing.
-  int64_t t_us = esp_timer_get_time();
-  char hex[CAPTURE_CHUNK_LEN * 2 + 1];
-  to_hex(buf, static_cast<size_t>(len), hex);
-  ESP_LOGI(CAPTURE_TAG, "BUSCAP,%lld,bus,%s", static_cast<long long>(t_us), hex);
+  // Flush on the plan's 4 ms silence backstop (2.1/2.5.1) or when the buffer
+  // hits the max observed frame size, whichever comes first.
+  bool silence_elapsed = (now_us - this->capture_last_byte_us_) >= CAPTURE_SILENCE_US;
+  bool buffer_full = this->capture_len_ >= sizeof(this->capture_buf_);
+  if (silence_elapsed || buffer_full)
+    flush(this->capture_last_byte_us_);
 #endif
 }
 

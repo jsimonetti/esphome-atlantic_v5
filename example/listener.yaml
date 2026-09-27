@@ -22,4 +22,4 @@ atlantic_v5:
   bus_capture: true
   hmi:
     uart_num: 1
-    rx_pin: GPIO16
+    rx_pin: GPIO7

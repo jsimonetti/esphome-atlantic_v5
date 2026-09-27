@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "esphome/core/component.h"
 
 #ifdef USE_ESP32
@@ -31,6 +33,14 @@ class AtlanticV5Component : public Component {
   // M0.5: minimal listener-mode UART bring-up feeding bus_capture (3.5.5).
   // Folds into transport/uart_bus_io.* once M6 builds the full BusIo layer.
   uart_port_t port_{UART_NUM_1};
+
+  // Frames are variable-length (plan 2.3), so bus_capture accumulates bytes
+  // across loop() calls and flushes on the plan's 4 ms silence backstop
+  // (2.1/2.5.1) rather than logging whatever a single loop() tick read.
+  static constexpr size_t CAPTURE_BUF_LEN = 32;  // matches the documented max frame size
+  uint8_t capture_buf_[CAPTURE_BUF_LEN]{};
+  size_t capture_len_{0};
+  int64_t capture_last_byte_us_{0};
 #endif
   Mode mode_{Mode::LISTENER};
   bool bus_capture_{false};
