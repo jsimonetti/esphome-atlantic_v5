@@ -22,3 +22,8 @@ trailers) were computed by us rather than taken verbatim from the source.
 Like `synthetic_*.csv`, they must never be used to freeze `*.expected.json`
 golden files — only a human review against our own real hardware capture
 satisfies M3.
+
+`external_*.replay-output.json` is `replay` CLI output run against the
+matching `external_*.csv`, kept for manual inspection only — not a golden
+file, not asserted by any test, gitignored like its source capture.
+
