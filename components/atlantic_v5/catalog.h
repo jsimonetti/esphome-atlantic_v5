@@ -104,8 +104,8 @@ constexpr uint64_t HMI_VERSION = 0x0165000301ULL;
 constexpr uint64_t HMI_MODEL = 0x0165000A01ULL;
 
 // Every mapped key above, ascending. Kept as a plain key array (rather than
-// only as named constants) so the disjointness assert below and ticket 13's
-// table-driven dispatch can both walk it.
+// only as named constants) so the disjointness assert below has a walkable
+// list. Not read by decode(), which dispatches on its own switch.
 constexpr uint64_t MAPPED[] = {
     FIRMWARE_VERSION,
     SERIAL_NUMBER,

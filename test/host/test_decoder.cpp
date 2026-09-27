@@ -98,6 +98,42 @@ const atlantic_v5::DecodedValue *find(const Collector &c, atlantic_v5::EntityId 
   return nullptr;
 }
 
+// Builds a CRC-valid frame from a header key plus payload, so a header with no
+// capture fixture can still be put through decode().
+atlantic_v5::Frame make_frame(uint64_t key, const uint8_t *payload, uint8_t len) {
+  uint8_t buf[atlantic_v5::MAX_FRAME] = {};
+  for (int i = 0; i < atlantic_v5::HEADER_LEN; i++)
+    buf[i] = static_cast<uint8_t>(key >> (8 * (atlantic_v5::HEADER_LEN - 1 - i)));
+  uint8_t n = atlantic_v5::HEADER_LEN;
+  if (len > 0) {
+    buf[n++] = len;
+    std::memcpy(buf + n, payload, len);
+    n = static_cast<uint8_t>(n + len);
+  }
+  uint16_t crc = atlantic_v5::crc16_modbus(buf, n);
+  buf[n] = static_cast<uint8_t>(crc & 0xFF);
+  buf[n + 1] = static_cast<uint8_t>((crc >> 8) & 0xFF);
+  return atlantic_v5::Frame(atlantic_v5::Channel::BUS, buf, static_cast<uint8_t>(n + 2));
+}
+
+// Decodes one frame in isolation and asserts it emitted exactly the two
+// expected entity ids, in order. Emitting the right values against a
+// neighbouring id is the failure mode worth catching here.
+void check_pair(uint64_t key, const uint8_t *payload, uint8_t len, atlantic_v5::EntityId first,
+                atlantic_v5::EntityId second, Collector *out) {
+  atlantic_v5::Frame f = make_frame(key, payload, len);
+  CHECK(f.crc_valid());
+  atlantic_v5::Decoder decoder;
+  out->values.clear();
+  decoder.decode(f, collect, out);
+  CHECK(decoder.stats().length_mismatches == 0);
+  CHECK(decoder.stats().unknown_headers == 0);
+  CHECK(decoder.stats().unmapped_frames == 0);
+  CHECK(out->values.size() == 2);
+  CHECK(out->values[0].id == first);
+  CHECK(out->values[1].id == second);
+}
+
 }  // namespace
 
 int main() {
@@ -351,6 +387,83 @@ int main() {
     CHECK(c.values.empty());
     CHECK(decoder.stats().length_mismatches == 1);
     CHECK(decoder.stats().unknown_headers == 0);
+  }
+
+  // --- The seven mapped headers that appear in no capture fixture (ticket 14):
+  // compressor_outlet / air_inlet / evaporator_3 minmax, and cycles 3-6. Frames
+  // are built here rather than replayed, so a wrong entity id in the dispatch
+  // cannot hide behind a golden baseline. Payloads are hand-encoded from
+  // docs/protocol.md's codec table; every value is distinct across headers so a
+  // cross-wired id shows up as a wrong number, not a coincidence. ---
+  {
+    Collector c;
+
+    // minmax: 00 <min:int16> <max:int16>, hundredths of a degree.
+    const uint8_t compressor[] = {0x00, 0x0B, 0xB8, 0x1F, 0x40};  // 30.00 / 80.00
+    check_pair(atlantic_v5::header::COMPRESSOR_OUTLET_TEMPERATURE_MINMAX, compressor, 5,
+               atlantic_v5::ENT_COMPRESSOR_OUTLET_TEMPERATURE_MIN, atlantic_v5::ENT_COMPRESSOR_OUTLET_TEMPERATURE_MAX,
+               &c);
+    CHECK(c.values[0].f == 30.00f);
+    CHECK(c.values[1].f == 80.00f);
+
+    const uint8_t air_inlet[] = {0x00, 0xFE, 0x0C, 0x10, 0xCC};  // -5.00 / 43.00
+    check_pair(atlantic_v5::header::AIR_INLET_TEMPERATURE_MINMAX, air_inlet, 5,
+               atlantic_v5::ENT_AIR_INLET_TEMPERATURE_MIN, atlantic_v5::ENT_AIR_INLET_TEMPERATURE_MAX, &c);
+    CHECK(c.values[0].f == -5.00f);
+    CHECK(c.values[1].f == 43.00f);
+
+    const uint8_t evap3[] = {0x00, 0x00, 0x7D, 0x03, 0xCF};  // 1.25 / 9.75
+    check_pair(atlantic_v5::header::EVAPORATOR_3_TEMPERATURE_MINMAX, evap3, 5,
+               atlantic_v5::ENT_EVAPORATOR_3_TEMPERATURE_MIN, atlantic_v5::ENT_EVAPORATOR_3_TEMPERATURE_MAX, &c);
+    CHECK(c.values[0].f == 1.25f);
+    CHECK(c.values[1].f == 9.75f);
+
+    // cycle: secs_in_state0, secs_in_state1, count (three uint32 BE).
+    // active == (secs_in_state1 > 0), so 3 and 5 are active, 4 and 6 are not.
+    const uint8_t cycle3[] = {0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 101};
+    check_pair(atlantic_v5::header::CYCLE_3, cycle3, 12, atlantic_v5::ENT_CYCLE_3_ACTIVE,
+               atlantic_v5::ENT_CYCLE_3_COUNT, &c);
+    CHECK(c.values[0].b == true);
+    CHECK(c.values[1].u == 101u);
+
+    const uint8_t cycle4[] = {0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 102};
+    check_pair(atlantic_v5::header::CYCLE_4, cycle4, 12, atlantic_v5::ENT_CYCLE_4_ACTIVE,
+               atlantic_v5::ENT_CYCLE_4_COUNT, &c);
+    CHECK(c.values[0].b == false);
+    CHECK(c.values[1].u == 102u);
+
+    const uint8_t cycle5[] = {0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 103};
+    check_pair(atlantic_v5::header::CYCLE_5, cycle5, 12, atlantic_v5::ENT_CYCLE_5_ACTIVE,
+               atlantic_v5::ENT_CYCLE_5_COUNT, &c);
+    CHECK(c.values[0].b == true);
+    CHECK(c.values[1].u == 103u);
+
+    const uint8_t cycle6[] = {0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 0, 104};
+    check_pair(atlantic_v5::header::CYCLE_6, cycle6, 12, atlantic_v5::ENT_CYCLE_6_ACTIVE,
+               atlantic_v5::ENT_CYCLE_6_COUNT, &c);
+    CHECK(c.values[0].b == false);
+    CHECK(c.values[1].u == 104u);
+  }
+
+  // --- header::MAPPED and decode()'s case labels are two hand-maintained
+  // lists with nothing tying them together (ticket 14). A payload-less frame
+  // for a mapped header is silently skipped by design (plan 2.2: the request
+  // side of a READ carries no payload), so any MAPPED key lacking a dispatch
+  // arm falls to default: and shows up as an unknown or unmapped frame. ---
+  {
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    for (size_t i = 0; i < atlantic_v5::header::MAPPED_COUNT; i++) {
+      atlantic_v5::Frame f = make_frame(atlantic_v5::header::MAPPED[i], nullptr, 0);
+      CHECK(f.crc_valid());
+      CHECK(!f.has_payload());
+      decoder.decode(f, collect, &c);
+    }
+    CHECK(c.values.empty());
+    CHECK(decoder.stats().unknown_headers == 0);
+    CHECK(decoder.stats().last_unknown_header == 0);
+    CHECK(decoder.stats().unmapped_frames == 0);
+    CHECK(decoder.stats().length_mismatches == 0);
   }
 
   TEST_MAIN_RETURN();
