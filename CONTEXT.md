@@ -11,6 +11,14 @@ _Avoid_: packet, message
 **Header key**:
 The first 5 bytes of a Frame as a big-endian `uint64_t`; the dispatch key used for decoding and for matching the rewrite target.
 
+**Unmapped frame**:
+A Frame whose header key appears in the message catalogue but has no established meaning, so no entity is derived from it. Expected, routine traffic.
+_Avoid_: unknown frame
+
+**Unknown frame**:
+A Frame whose header key is absent from the message catalogue entirely — traffic we have never seen before. The only kind that warrants operator attention.
+_Avoid_: unmapped frame, undecoded frame
+
 **Channel**:
 Which party a byte stream or Frame came from: `HMI`, `MAIN`, or `BUS` (single-wire listener capture, where direction isn't separable at the wire).
 
@@ -37,6 +45,13 @@ An entity that only ever receives `publish_state()` from the hub and never write
 
 **RelayPolicy** / **Rewrite**:
 The only code path allowed to alter bus bytes in flight; applies solely to the input-status frame (header `0x0164FF1403`), per the control surface described in the implementation plan.
+
+**Observed input**:
+The state of the appliance's physical I1/I2 contacts, as MAIN reports it on the bus. What the input entities publish in every mode: a Rewrite never changes what they report.
+_Avoid_: input state (ambiguous with effective input)
+
+**Effective input**:
+The I1/I2 values MAIN actually acts on — equal to the observed input under passthrough, and to the Rewrite's substituted values otherwise. Deliberately not an entity: it is already implied by the control-mode entity.
 
 **Bus capture** (`bus_capture`):
 Raw, pre-assembly byte+timestamp logging, used to harvest real `test/captures/*.csv` files from a user's own hardware. Runs upstream of the FrameAssembler; needs no decode logic.
