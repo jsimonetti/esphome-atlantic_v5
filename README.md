@@ -87,11 +87,33 @@ and the log carries a best-effort warning.
 
 The bus itself is 38400 baud, 8N1, half-duplex, single-wire — not a level
 your ESP32 GPIOs can safely share directly with the heat pump's electronics.
-Each side needs its own transceiver (e.g. the SN74LVC2T45-based level-shifter
-board used during this component's own development) sitting between the ESP32
-UART and the HMI or MAIN connector. How that transceiver's direction is
-controlled is the one piece of wiring variation this component handles in
-three ways:
+Each side needs its own transceiver sitting between the ESP32 UART and the HMI
+or MAIN connector. How that transceiver's direction is controlled is the one
+piece of wiring variation this component handles in three ways:
+
+### Boards
+
+There is no board specific to this component. The electrical problem is
+identical to the one [AquaMQTT](https://github.com/tspopp/AquaMQTT) solves for
+the older (V3/V4) Groupe Atlantic protocols, and its hardware works here
+unchanged — the V5 protocol differs, the wiring does not. See
+[AquaMQTT's `pcb/` directory](https://github.com/tspopp/AquaMQTT/tree/main/pcb)
+for the board designs (revision 2.0 is the SN74LVC2T45-based one, orderable
+pre-assembled from JLCPCB) and
+[its `WIRING.md`](https://github.com/tspopp/AquaMQTT/blob/main/WIRING.md) for
+how to get at the HMI–MAIN link inside the unit. That revision-2.0 board is
+what this component was developed against.
+
+Board-specific notes for this component:
+
+- The AquaMQTT board routes each side's TX and RX onto one physical bus wire,
+  so set `one_wire_mirror: true` (Case C below) on both sides.
+- Revision 2.0's passthrough jumper must be **installed** for `mode: listener`
+  and **removed** for `mode: mitm`.
+- Not every board in circulation exposes DIR / TX-enable lines. Without them,
+  `mode: mitm` may not be able to drive the bus at all; `mode: listener`
+  still works. The [startup self-test](#startup-self-test) is there to tell
+  you which situation you're in.
 
 ### Case A — DIR / TX-enable pin present
 
@@ -135,6 +157,18 @@ whatever rewrite you've asked for (see below) may not be reaching the bus
 electrically, even though the component believes it sent it.
 
 ## Control (MITM only): `select: control_mode`
+
+> **Before you use this.** Using `mitm` means opening a mains-powered
+> appliance, cutting the wire between its two controllers, and putting your
+> own electronics in the middle of it. Nobody has tested this on your unit.
+> Expect that it will void your warranty, that your installer will not
+> support it, and that a wiring mistake can damage the HMI, the MAIN board,
+> or you. The component is written to fail safe — it forwards anything it
+> doesn't fully understand, byte-for-byte — but that is a property of the
+> software, not of your soldering. There is no warranty here either; see
+> [License](#license). Power the unit down before touching anything, and if
+> you are not comfortable working inside it, use `mode: listener`, which only
+> ever reads.
 
 ```yaml
 select:
@@ -293,3 +327,35 @@ The host test suite (`test_crc`, `test_assembler`, `test_decoder`,
 toolchain at all — it's the primary verification mechanism for everything in
 `core/`/`transport/` per the implementation plan's "test strategy without
 hardware" (1.7).
+
+## Prior art and credits
+
+This component exists because of work done elsewhere first:
+
+- **[AquaMQTT](https://github.com/tspopp/AquaMQTT)** by
+  [@tspopp](https://github.com/tspopp) and contributors — the original
+  MQTT bridge for Groupe Atlantic DHW heat pumps, and the source of the
+  hardware this component runs on (see "Boards" above). Apache-2.0.
+- **[AquaMQTT PR #127, "Support V5 protocol"](https://github.com/tspopp/AquaMQTT/pull/127)**
+  by [@wowtor](https://github.com/wowtor) — the first working V5
+  implementation, developed against real Explorer V5 hardware, together with
+  its own protocol notes. Every field description in
+  [`docs/protocol.md`](docs/protocol.md) was cross-checked against it. That PR
+  is also where the idea of an ESPHome port was raised, by its participants.
+- Bus data contributed by third parties in AquaMQTT issue threads, used as
+  reference captures under `test/captures/external_*.csv`; each file records
+  its own source, author and date.
+
+This is an independent implementation, not a fork or a port: the decode,
+framing, relay and entity code here was written against the ESPHome component
+model from scratch. What it took from the above is protocol knowledge,
+hardware, and the confidence that MITM on this bus works at all.
+
+## License
+
+[Apache License 2.0](LICENSE) — the same license as AquaMQTT, so code can move
+between the two projects in either direction.
+
+Note that ESPHome's own C++ runtime is GPLv3 (its Python tooling is MIT), so
+any firmware you build that combines this component with ESPHome is GPLv3 as a
+whole. The sources in this repository remain Apache-2.0.
