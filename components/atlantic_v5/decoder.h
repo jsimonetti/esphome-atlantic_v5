@@ -60,11 +60,15 @@ class Decoder {
   using Sink = void (*)(void *ctx, const DecodedValue &);
 
   // Dispatches on f.header_key(). Never decodes a frame whose CRC failed (plan
-  // 2.6). Validates payload length against the header's expected length before
-  // decoding; a mismatch is counted (stats().length_mismatches) and the frame
-  // is skipped, never partially decoded. A header in header::UNMAPPED counts as
-  // stats().unmapped_frames; one in neither table counts as
-  // stats().unknown_headers. Both emit nothing (passthrough-and-count).
+  // 2.6). Validates the payload before decoding, and never decodes one
+  // partially: fixed-offset codecs require the header's exact catalogued
+  // length, while a text field only has to fit the frame as received and end
+  // in 0x00 (ticket 19). A rejected payload counts as
+  // stats().length_mismatches; a text field accepted at a width the catalogue
+  // does not describe is published and counts as stats().text_length_variants.
+  // A header in header::UNMAPPED counts as stats().unmapped_frames; one in
+  // neither table counts as stats().unknown_headers. Both emit nothing
+  // (passthrough-and-count).
   void decode(const Frame &f, Sink sink, void *ctx) const;
 
   struct Stats {
@@ -73,7 +77,18 @@ class Decoder {
     // forever on healthy hardware, so it is deliberately never published as an
     // entity - it exists to keep unknown_headers meaningful.
     uint32_t unmapped_frames = 0;
+    // Structural rejections: nothing was published for the frame.
     uint32_t length_mismatches = 0;
+    // A text field whose declared width differs from the catalogue's, but which
+    // was still structurally valid and therefore published (ticket 19). Not a
+    // rejection - it flags a firmware revision this catalogue does not describe.
+    uint32_t text_length_variants = 0;
+    // The most recent frame that hit either of the two counters above, so the
+    // operator-facing diagnostic can name the header instead of just a tally.
+    // 0 (never a valid header, byte 0 is always 0x01) until the first one.
+    uint64_t last_length_anomaly_header = 0;
+    uint8_t last_length_anomaly_expected = 0;
+    uint8_t last_length_anomaly_actual = 0;
     // The most recent header_key() that fell to the unknown-header case (plan
     // 3.8's last_unknown_frame diagnostic). 0 (never a valid header, byte 0 is
     // always 0x01) until the first unknown header is seen.
@@ -87,6 +102,9 @@ class Decoder {
 
  private:
   bool check_length(const Frame &f, uint8_t expected) const;
+  bool check_text_length(const Frame &f, uint8_t expected, uint8_t *len_out) const;
+  void record_length_anomaly(const Frame &f, uint8_t expected, uint8_t actual) const;
+  void emit_text_field(const Frame &f, Sink sink, void *ctx, uint16_t id, uint8_t expected) const;
   void emit_minmax(const Frame &f, Sink sink, void *ctx, uint16_t min_id, uint16_t max_id) const;
   void emit_cycle(const Frame &f, Sink sink, void *ctx, uint16_t active_id, uint16_t count_id) const;
   void record_unknown(const Frame &f) const;

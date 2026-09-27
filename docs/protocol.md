@@ -139,8 +139,19 @@ to state 0, field 3 increments. Therefore `active = (secs_in_state1 > 0)` and
 `count = field3`. The physical meaning of each of the six cycles is not
 established.
 
-Always validate payload length against the expected length for the header before
-decoding. Never decode a frame whose CRC failed.
+**Text field widths are documented, not enforced.** The `Len` column below
+records the width every observed firmware uses, but the decoder validates a
+`text` payload structurally — it must fit the frame as actually received and
+end in `0x00` — rather than requiring that exact width. A firmware revision
+with a different width still publishes its value, and increments the
+`text_length_variants` diagnostic so the divergence is reported rather than
+disappearing. Every other codec reads fixed offsets, so those widths *are*
+enforced exactly; a disagreement there rejects the frame and increments
+`length_mismatches`.
+
+Always validate a payload before decoding it: against the header's expected
+length for every fixed-offset codec, structurally for `text` as described above.
+Never decode a frame whose CRC failed.
 
 ## Message catalogue
 

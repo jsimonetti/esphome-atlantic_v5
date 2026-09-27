@@ -29,6 +29,10 @@ bool Frame::has_payload() const { return len_ > PAYLOAD_LESS_LEN; }
 
 uint8_t Frame::payload_len() const { return has_payload() ? buf_[HEADER_LEN] : 0; }
 
+uint8_t Frame::buffered_payload_len() const {
+  return has_payload() ? static_cast<uint8_t>(len_ - (PAYLOAD_OFFSET + 2)) : 0;
+}
+
 const uint8_t *Frame::payload() const { return buf_ + PAYLOAD_OFFSET; }
 
 bool Frame::crc_valid() const {

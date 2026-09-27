@@ -62,6 +62,11 @@ enum EntityId : uint16_t {
   ENT_RESYNCS,
   ENT_DROPPED_BYTES,
   ENT_UNKNOWN_FRAMES,
+  // Decoder payload-validation counters (ticket 19): frames rejected as
+  // structurally invalid, and text fields published despite a width this
+  // catalogue does not describe.
+  ENT_LENGTH_MISMATCHES,
+  ENT_TEXT_LENGTH_VARIANTS,
   ENT_FRAMES_RELAYED,
   ENT_REWRITES_APPLIED,
   ENT_ECHO_BYTES,

@@ -368,25 +368,127 @@ int main() {
     CHECK(water_temp_count == 0);  // 0164FEB006 only appears in this capture as the corrupted frame
   }
 
-  // --- Payload length mismatch: a well-formed CRC over a frame whose length
-  // byte disagrees with the header's expected payload length must be rejected
-  // (counted), never partially decoded. ---
+  // --- Text payload length is gated structurally, not pinned to the catalogue
+  // width (ticket 19): a NUL-terminated field that fits the buffered frame and
+  // DecodedValue::text is published and counted as a variant; anything that
+  // would read past the frame, overflow the text buffer, or lack a terminator
+  // is rejected and counted as a mismatch. ---
   {
-    // Header 0164006401 (firmware_version, expects 17), but only 3 payload bytes.
-    uint8_t frame[] = {0x01, 0x64, 0x00, 0x64, 0x01, 0x03, '2', '.', '9', 0x00, 0x00};
+    // Catalogue width (firmware_version, 17): decodes, neither counter moves.
+    uint8_t payload[17] = {'2', '.', '9'};
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 17);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.size() == 1);
+    CHECK(std::strcmp(c.values[0].text, "2.9") == 0);
+    CHECK(decoder.stats().length_mismatches == 0);
+    CHECK(decoder.stats().text_length_variants == 0);
+    CHECK(decoder.stats().last_length_anomaly_header == 0);
+  }
+  {
+    // Narrower than the catalogue but still NUL-terminated: same string,
+    // published, counted as a variant and not as a mismatch.
+    uint8_t payload[4] = {'2', '.', '9', 0x00};
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 4);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.size() == 1);
+    CHECK(c.values[0].id == atlantic_v5::ENT_FIRMWARE_VERSION);
+    CHECK(std::strcmp(c.values[0].text, "2.9") == 0);
+    CHECK(decoder.stats().text_length_variants == 1);
+    CHECK(decoder.stats().length_mismatches == 0);
+    CHECK(decoder.stats().last_length_anomaly_header == atlantic_v5::header::FIRMWARE_VERSION);
+    CHECK(decoder.stats().last_length_anomaly_expected == 17);
+    CHECK(decoder.stats().last_length_anomaly_actual == 4);
+  }
+  {
+    // Wider than the catalogue, up to the last width DecodedValue::text can
+    // hold without clipping (23 chars + NUL): accepted, counted as a variant.
+    uint8_t payload[23] = {};
+    std::memset(payload, 'A', 22);
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::CONTROLLER_MODEL, payload, 23);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.size() == 1);
+    CHECK(std::strlen(c.values[0].text) == 22);
+    CHECK(decoder.stats().text_length_variants == 1);
+    CHECK(decoder.stats().length_mismatches == 0);
+  }
+  {
+    // One byte wider: decode_text would silently clip at 23, so reject instead.
+    uint8_t payload[24] = {};
+    std::memset(payload, 'A', 23);
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::CONTROLLER_MODEL, payload, 24);
+    CHECK(f.payload_len() == 24);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.empty());
+    CHECK(decoder.stats().length_mismatches == 1);
+    CHECK(decoder.stats().text_length_variants == 0);
+    CHECK(decoder.stats().last_length_anomaly_actual == 24);
+  }
+  {
+    // A length byte claiming more than the frame actually buffered: the exact
+    // check used to bound this by accident, so guard it explicitly.
+    uint8_t frame[] = {0x01, 0x64, 0x00, 0x64, 0x01, 0x11, '2', '.', '9', 0x00, 0x00, 0x00};
     uint16_t crc = atlantic_v5::crc16_modbus(frame, sizeof(frame) - 2);
     frame[sizeof(frame) - 2] = static_cast<uint8_t>(crc & 0xFF);
     frame[sizeof(frame) - 1] = static_cast<uint8_t>((crc >> 8) & 0xFF);
 
     atlantic_v5::Frame f(atlantic_v5::Channel::BUS, frame, sizeof(frame));
     CHECK(f.crc_valid());
+    CHECK(f.payload_len() == 17);  // but only 5 bytes are buffered
 
     atlantic_v5::Decoder decoder;
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
     CHECK(decoder.stats().length_mismatches == 1);
-    CHECK(decoder.stats().unknown_headers == 0);
+    CHECK(decoder.stats().text_length_variants == 0);
+  }
+  {
+    // No trailing NUL: structurally invalid whatever the width, never published.
+    uint8_t payload[17];
+    std::memset(payload, 'A', sizeof(payload));
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 17);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.empty());
+    CHECK(decoder.stats().length_mismatches == 1);
+    CHECK(decoder.stats().text_length_variants == 0);
+  }
+  {
+    // A variant width that is *also* structurally invalid must land in the
+    // rejection counter only: text_length_variants means "published anyway".
+    uint8_t payload[4];
+    std::memset(payload, 'A', sizeof(payload));
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 4);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.empty());
+    CHECK(decoder.stats().length_mismatches == 1);
+    CHECK(decoder.stats().text_length_variants == 0);
+  }
+  {
+    // Scope guard: non-text codecs read fixed offsets into the payload, so
+    // their exact-length check must stay exact. setpoint expects 2 bytes.
+    const uint8_t payload[3] = {0x13, 0x88, 0x00};
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::SETPOINT, payload, 3);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.empty());
+    CHECK(decoder.stats().length_mismatches == 1);
+    CHECK(decoder.stats().text_length_variants == 0);
+    CHECK(decoder.stats().last_length_anomaly_header == atlantic_v5::header::SETPOINT);
+    CHECK(decoder.stats().last_length_anomaly_expected == 2);
+    CHECK(decoder.stats().last_length_anomaly_actual == 3);
   }
 
   // --- The seven mapped headers that appear in no capture fixture (ticket 14):

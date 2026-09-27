@@ -49,6 +49,8 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "resyncs",
     "dropped_bytes",
     "unknown_frames",
+    "length_mismatches",
+    "text_length_variants",
     "frames_relayed",
     "rewrites_applied",
     "echo_bytes",

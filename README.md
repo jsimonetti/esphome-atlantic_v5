@@ -276,6 +276,8 @@ sensor:
     resyncs: {name: DHW resyncs}
     dropped_bytes: {name: DHW dropped bytes}
     unknown_frames: {name: DHW unknown frames}
+    length_mismatches: {name: DHW length mismatches}
+    text_length_variants: {name: DHW text length variants}
     # mitm-only (stay at 0 in listener mode):
     frames_relayed: {name: DHW frames relayed}
     rewrites_applied: {name: DHW rewrites applied}
@@ -322,6 +324,18 @@ are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
 (e.g. `0164DEAD01`) so it can be reported upstream; with the
 `raw_frame_dump` switch on, the frame's payload hex is appended after a
 space (e.g. `0164DEAD01 BEEF`).
+
+`length_mismatches` counts frames whose payload was rejected as structurally
+unusable — a length byte disagreeing with a fixed-offset codec's width, a
+length claiming more bytes than the frame carried, or a text field with no
+terminating NUL. Nothing is published for those frames.
+`text_length_variants` counts the opposite case: an identity text field
+(version/serial/model) whose width differs from
+[`docs/protocol.md`](docs/protocol.md)'s catalogue but which was otherwise
+valid, so its value *was* published. A non-zero value there means your
+firmware revision disagrees with the catalogue and is worth reporting; both
+counters also emit a rate-limited warning log naming the header and the two
+lengths.
 
 ### `raw_frame_dump` vs `bus_capture`
 

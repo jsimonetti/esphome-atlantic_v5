@@ -95,9 +95,57 @@ bool Decoder::check_length(const Frame &f, uint8_t expected) const {
     return false;
   if (f.payload_len() != expected) {
     stats_.length_mismatches++;
+    record_length_anomaly(f, expected, f.payload_len());
     return false;
   }
   return true;
+}
+
+void Decoder::record_length_anomaly(const Frame &f, uint8_t expected, uint8_t actual) const {
+  stats_.last_length_anomaly_header = f.header_key();
+  stats_.last_length_anomaly_expected = expected;
+  stats_.last_length_anomaly_actual = actual;
+}
+
+// Ticket 19: the identity text fields are fixed-width and NUL-padded, and the
+// width is catalogued but not guaranteed across firmware revisions. Gate on the
+// two things that are genuinely unsafe to get wrong - reading past what was
+// buffered, and a string too long for DecodedValue::text (which decode_text
+// would otherwise silently clip) - and let decode_text's trailing-NUL check be
+// the real structural gate. A width that merely disagrees with the catalogue is
+// published and counted separately, so a divergent firmware reports itself
+// instead of disappearing.
+bool Decoder::check_text_length(const Frame &f, uint8_t expected, uint8_t *len_out) const {
+  if (!f.has_payload())
+    return false;
+  uint8_t declared = f.payload_len();
+  if (declared > f.buffered_payload_len() || declared > sizeof(DecodedValue::text) - 1) {
+    stats_.length_mismatches++;
+    record_length_anomaly(f, expected, declared);
+    return false;
+  }
+  *len_out = declared;
+  return true;
+}
+
+void Decoder::emit_text_field(const Frame &f, Sink sink, void *ctx, uint16_t id, uint8_t expected) const {
+  uint8_t len = 0;
+  if (!check_text_length(f, expected, &len))
+    return;
+  char text[sizeof(DecodedValue::text)];
+  if (!codec::decode_text(f.payload(), len, text, sizeof(text))) {
+    stats_.length_mismatches++;  // no trailing NUL: structurally invalid, never published
+    record_length_anomaly(f, expected, len);
+    return;
+  }
+  // Counted only once the value is genuinely published: "accepted despite
+  // disagreeing with the catalogue" has to stay a different fact from a
+  // rejection, or neither counter means anything.
+  if (len != expected) {
+    stats_.text_length_variants++;
+    record_length_anomaly(f, expected, len);
+  }
+  emit_text(sink, ctx, id, text);
 }
 
 void Decoder::emit_minmax(const Frame &f, Sink sink, void *ctx, uint16_t min_id, uint16_t max_id) const {
@@ -121,9 +169,7 @@ void Decoder::emit_cycle(const Frame &f, Sink sink, void *ctx, uint16_t active_i
 void Decoder::record_unknown(const Frame &f) const {
   stats_.unknown_headers++;
   stats_.last_unknown_header = f.header_key();
-  // payload_len() is a wire byte: a CRC-valid frame can still claim more than
-  // was actually buffered, so clamp to what the frame really holds.
-  uint8_t buffered = f.has_payload() ? static_cast<uint8_t>(f.raw_len() - (HEADER_LEN + 3)) : 0;
+  uint8_t buffered = f.buffered_payload_len();
   uint8_t len = f.payload_len() < buffered ? f.payload_len() : buffered;
   stats_.last_unknown_payload_len = len;
   if (len > 0)
@@ -137,38 +183,18 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
   const uint8_t *p = f.payload();
 
   switch (f.header_key()) {
-    case header::FIRMWARE_VERSION: {
-      if (!check_length(f, 17))
-        break;
-      char text[24];
-      if (codec::decode_text(p, 17, text, sizeof(text)))
-        emit_text(sink, ctx, ENT_FIRMWARE_VERSION, text);
+    case header::FIRMWARE_VERSION:
+      emit_text_field(f, sink, ctx, ENT_FIRMWARE_VERSION, 17);
       break;
-    }
-    case header::SERIAL_NUMBER: {
-      if (!check_length(f, 16))
-        break;
-      char text[24];
-      if (codec::decode_text(p, 16, text, sizeof(text)))
-        emit_text(sink, ctx, ENT_SERIAL_NUMBER, text);
+    case header::SERIAL_NUMBER:
+      emit_text_field(f, sink, ctx, ENT_SERIAL_NUMBER, 16);
       break;
-    }
-    case header::POWER_BOARD_VERSION: {
-      if (!check_length(f, 17))
-        break;
-      char text[24];
-      if (codec::decode_text(p, 17, text, sizeof(text)))
-        emit_text(sink, ctx, ENT_POWER_BOARD_VERSION, text);
+    case header::POWER_BOARD_VERSION:
+      emit_text_field(f, sink, ctx, ENT_POWER_BOARD_VERSION, 17);
       break;
-    }
-    case header::CONTROLLER_MODEL: {
-      if (!check_length(f, 13))
-        break;
-      char text[24];
-      if (codec::decode_text(p, 13, text, sizeof(text)))
-        emit_text(sink, ctx, ENT_CONTROLLER_MODEL, text);
+    case header::CONTROLLER_MODEL:
+      emit_text_field(f, sink, ctx, ENT_CONTROLLER_MODEL, 13);
       break;
-    }
     case header::SETPOINT: {
       if (!check_length(f, 2))
         break;
@@ -229,22 +255,12 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
       emit_bool(sink, ctx, ENT_HEATING_ACTIVE, codec::decode_bool(p + 2));
       break;
     }
-    case header::HMI_VERSION: {
-      if (!check_length(f, 17))
-        break;
-      char text[24];
-      if (codec::decode_text(p, 17, text, sizeof(text)))
-        emit_text(sink, ctx, ENT_HMI_VERSION, text);
+    case header::HMI_VERSION:
+      emit_text_field(f, sink, ctx, ENT_HMI_VERSION, 17);
       break;
-    }
-    case header::HMI_MODEL: {
-      if (!check_length(f, 13))
-        break;
-      char text[24];
-      if (codec::decode_text(p, 13, text, sizeof(text)))
-        emit_text(sink, ctx, ENT_HMI_MODEL, text);
+    case header::HMI_MODEL:
+      emit_text_field(f, sink, ctx, ENT_HMI_MODEL, 13);
       break;
-    }
     default:
       if (is_unmapped_header(f.header_key()))
         stats_.unmapped_frames++;

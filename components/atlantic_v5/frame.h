@@ -19,8 +19,12 @@ class Frame {
 
   // &raw()[HEADER_LEN + 1]. Only meaningful when has_payload().
   const uint8_t *payload() const;
-  // 0 for a payload-less (7-byte) frame; otherwise raw()[HEADER_LEN].
+  // 0 for a payload-less (7-byte) frame; otherwise raw()[HEADER_LEN]. This is a
+  // raw wire byte: a CRC-valid frame can still claim more than it carries, so
+  // anything reading payload() must bound itself by buffered_payload_len().
   uint8_t payload_len() const;
+  // How many payload bytes the frame actually holds, whatever payload_len() claims.
+  uint8_t buffered_payload_len() const;
   bool has_payload() const;
 
   // False for anything shorter than a minimal CRC-terminated frame.
