@@ -1,5 +1,6 @@
 // L1 core. Host-compilable: no esp-idf, no ESPHome, no Arduino, no exceptions, no heap.
-// Header constants + entity metadata for the message catalogue (plan 2.7). Kept next
+// Header constants + entity metadata for the message catalogue (docs/protocol.md
+// "Message catalogue"). Kept next
 // to the decoder so the catalogue and the code that implements it stay in one place.
 #pragma once
 
@@ -8,9 +9,9 @@
 
 namespace atlantic_v5 {
 
-// Index into L3's entity table (plan 3.3). Order mirrors the message catalogue
-// (plan 2.7), payload-bearing frames with known meaning only, plus a block of
-// diagnostic counters (plan 3.8) appended at the end - not part of the wire
+// Index into L3's entity table. Order mirrors the message catalogue in
+// docs/protocol.md, payload-bearing frames with known meaning only, plus a block of
+// diagnostic counters appended at the end - not part of the wire
 // catalogue, but published through the same entity-id/publish plumbing.
 enum EntityId : uint16_t {
   ENT_FIRMWARE_VERSION = 0,
@@ -54,15 +55,15 @@ enum EntityId : uint16_t {
   ENT_HMI_VERSION,
   ENT_HMI_MODEL,
 
-  // Diagnostics (plan 3.8), off by default; frames_ok/crc_errors/resyncs/
+  // Diagnostics, off by default; frames_ok/crc_errors/resyncs/
   // dropped_bytes/unknown_frames are per-side totals in mitm, single-assembler
-  // totals in listener (ticket 09, see build-and-tooling notes).
+  // totals in listener.
   ENT_FRAMES_OK,
   ENT_CRC_ERRORS,
   ENT_RESYNCS,
   ENT_DROPPED_BYTES,
   ENT_UNKNOWN_FRAMES,
-  // Decoder payload-validation counters (ticket 19): frames rejected as
+  // Decoder payload-validation counters: frames rejected as
   // structurally invalid, and text fields published despite a width this
   // catalogue does not describe.
   ENT_LENGTH_MISMATCHES,
@@ -77,16 +78,16 @@ enum EntityId : uint16_t {
   ENT_LAST_UNKNOWN_FRAME,
   ENT_LAST_FRAME_DUMP,
   ENT_SELF_TEST_RESULT,
-  // Not wire traffic either: the staleness gate's own state (ticket 16).
+  // Not wire traffic either: the staleness gate's own state.
   ENT_CONNECTED,
   ENT_COUNT
 };
 
-// The JSON/entity key for id, per the catalogue's Entity column (2.7). Returns
+// The JSON/entity key for id, per the catalogue's Entity column. Returns
 // "unknown" for anything outside [0, ENT_COUNT).
 const char *entity_name(EntityId id);
 
-// Header keys for payload-bearing frames with known meaning (plan 2.7).
+// Header keys for payload-bearing frames with known meaning.
 namespace header {
 constexpr uint64_t FIRMWARE_VERSION = 0x0164006401ULL;
 constexpr uint64_t SERIAL_NUMBER = 0x0164006601ULL;

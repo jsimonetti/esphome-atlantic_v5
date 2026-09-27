@@ -1,5 +1,5 @@
-// L2 transport, hardware-free (plan M5 / 3.6.1 minus the FreeRTOS/queue specifics,
-// which are RelayTask's job at M6). Driven purely by BusIo + a caller-owned clock,
+// L2 transport, hardware-free (the FreeRTOS/queue specifics are RelayTask's job).
+// Driven purely by BusIo + a caller-owned clock,
 // so it is fully verifiable on a host with a mock BusIo and no Decoder dependency.
 #pragma once
 
@@ -11,12 +11,12 @@
 
 namespace atlantic_v5 {
 
-inline constexpr uint32_t DEFAULT_ECHO_DRAIN_US = 200;  // plan 3.5.3 default
+inline constexpr uint32_t DEFAULT_ECHO_DRAIN_US = 200;
 
 // Declared outside Relay: a nested struct's default member initializers can't be
 // used in a default argument of the enclosing class's own constructor.
 struct RelayConfig {
-  uint32_t silence_us = FrameAssembler::DEFAULT_SILENCE_US;  // plan 2.1/2.5.1 backstop
+  uint32_t silence_us = FrameAssembler::DEFAULT_SILENCE_US;  // framing backstop
   uint32_t echo_drain_us = DEFAULT_ECHO_DRAIN_US;
 };
 
@@ -26,7 +26,7 @@ class Relay {
 
   Relay(BusIo &hmi_io, BusIo &main_io, RelayPolicy &policy, Config cfg = Config{});
 
-  // Raw pre-assembly byte capture (plan 3.5.5, MITM piggyback): invoked with every
+  // Raw pre-assembly byte capture (MITM piggyback): invoked with every
   // chunk read from either side, before echo classification, as a byproduct of
   // reads the relay task is already doing — never an extra poll. Set once, before
   // the first poll() call.
@@ -36,9 +36,9 @@ class Relay {
     capture_ctx_ = ctx;
   }
 
-  // Cross-thread handoff (plan 3.6.5): invoked once per completed frame, after it
+  // Cross-thread handoff: invoked once per completed frame, after it
   // has already been forwarded to the opposite side ("forward first, enqueue
-  // second", plan 3.9 #1) — a sink that drops the event can never affect
+  // second") — a sink that drops the event can never affect
   // forwarding, which has already happened by the time this runs. f reflects any
   // rewrite RelayPolicy::apply already applied, i.e. the bytes that went out on
   // the wire. observed_payload is the payload as received, non-null only when a
@@ -69,8 +69,8 @@ class Relay {
   };
   const Stats &stats() const { return stats_; }
 
-  // plan 3.8: relay_latency_avg_us/max_us are "reset on read or on an hourly
-  // window" - the diagnostics publish cycle calls this right after reading, so
+  // relay_latency_avg_us/max_us are reset on read: the diagnostics publish cycle
+  // calls this right after reading, so
   // each published value covers "since the last read", not "since boot".
   // frames_relayed/rewrites_applied/echo_bytes are plain cumulative counters
   // and are never reset.

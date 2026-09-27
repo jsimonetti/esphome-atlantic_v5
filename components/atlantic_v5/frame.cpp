@@ -7,7 +7,7 @@
 namespace atlantic_v5 {
 
 namespace {
-// Payload-less frame total length: 5-byte header + 2-byte CRC (plan 2.3).
+// Payload-less frame total length: 5-byte header + 2-byte CRC.
 constexpr uint8_t PAYLOAD_LESS_LEN = HEADER_LEN + 2;
 // Payload starts right after the header and the 1-byte length field.
 constexpr uint8_t PAYLOAD_OFFSET = HEADER_LEN + 1;

@@ -97,7 +97,7 @@ uint8_t usable_payload_len(const Frame &f) {
 }  // namespace
 
 // A known header with no payload is the request/ack side of a READ/WRITE
-// transaction (plan 2.2), not an anomaly: nothing to decode, nothing to count.
+// transaction, not an anomaly: nothing to decode, nothing to count.
 // Only a payload that's present but the wrong size is a counted mismatch.
 bool Decoder::check_length(const Frame &f, uint8_t expected) const {
   if (!f.has_payload())
@@ -119,7 +119,7 @@ void Decoder::record_length_anomaly(const Frame &f, uint8_t expected, uint8_t ac
   stats_.last_length_anomaly_actual = actual;
 }
 
-// Ticket 19: the identity text fields are fixed-width and NUL-padded, and the
+// The identity text fields are fixed-width and NUL-padded, and the
 // width is catalogued but not guaranteed across firmware revisions. Gate on the
 // two things that are genuinely unsafe to get wrong - reading past what was
 // buffered, and a string too long for DecodedValue::text (which decode_text
@@ -189,7 +189,7 @@ void Decoder::record_unknown(const Frame &f) const {
 
 void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
   if (!f.crc_valid())
-    return;  // plan 2.6: never decode a frame whose CRC failed
+    return;  // never decode a frame whose CRC failed
 
   const uint8_t *p = f.payload();
 

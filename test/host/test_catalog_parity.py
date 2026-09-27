@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Assert core/catalog.h, catalog.cpp and the ESPHome platform .py files agree.
+"""Assert catalog.h, catalog.cpp and the ESPHome platform .py files agree.
 
-Plan 3.7.3: the Python `ENT_*` constants must stay in lockstep with
+The Python `ENT_*` constants must stay in lockstep with
 `catalog.h`'s `EntityId`, because a mismatch is silent — codegen emits
 `::atlantic_v5::ENT_SOMETHING` as raw text, so a renamed or reordered enum
 member surfaces as a compile error at best and as an entity publishing another

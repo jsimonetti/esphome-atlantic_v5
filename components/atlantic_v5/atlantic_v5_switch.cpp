@@ -5,7 +5,7 @@
 namespace esphome {
 namespace atlantic_v5_component {
 
-// Off by default (plan 3.8: "all off by default"); switch_::Switch's own
+// Off by default, like every other diagnostic; switch_::Switch's own
 // RESTORE_MODE_ALWAYS_OFF default (switch.py) means no explicit state to
 // publish here beyond keeping the hub's flag in sync at boot.
 void AtlanticV5RawFrameDumpSwitch::setup() {

@@ -10,8 +10,8 @@ CODEOWNERS = ["@jsimonetti"]
 
 # Controllable entity (ADR 0001): write_state() writes into the hub's
 # raw_frame_dump_ flag, so it gets its own dedicated class instead of the
-# read-only platforms' generic set_entity() table. Plan 3.8's raw_frame_dump
-# switch: gates whether already-framed, already-decoded frames get hex-dumped
+# read-only platforms' generic set_entity() table. The raw_frame_dump
+# switch gates whether already-framed, already-decoded frames get hex-dumped
 # to the last_frame_dump text sensor (see text_sensor.py).
 AtlanticV5RawFrameDumpSwitch = atlantic_v5_ns.class_("AtlanticV5RawFrameDumpSwitch", switch.Switch, cg.Component)
 

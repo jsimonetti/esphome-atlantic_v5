@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generates the synthetic_*.csv seed captures for ticket 01.
+"""Generates the synthetic_*.csv seed captures.
 
 Frame bytes are derived from the worked examples and message catalogue in
-Part 2 of docs/atlantic-v5-plan.md. Every CRC is computed
+docs/protocol.md. Every CRC is computed
 by two independent CRC-16/MODBUS implementations (reflected bit-shift vs.
 byte-reflected MSB-first) and cross-checked before being written out, so
 nothing here is eyeballed.
@@ -18,7 +18,7 @@ CAPTURES_DIR = Path(__file__).parent
 
 
 def crc16_modbus_bitshift(data: bytes) -> int:
-    """Reference implementation from the implementation plan (Part 2.4)."""
+    """Reference implementation from docs/protocol.md's CRC section."""
     crc = 0xFFFF
     for byte in data:
         crc ^= byte

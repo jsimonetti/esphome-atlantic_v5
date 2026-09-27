@@ -32,7 +32,7 @@ atlantic_v5_ns = cg.esphome_ns.namespace("atlantic_v5_component")
 AtlanticV5Component = atlantic_v5_ns.class_("AtlanticV5Component", cg.Component)
 Mode = atlantic_v5_ns.enum("Mode", is_class=True)
 # Shared with sensor.py/binary_sensor.py/text_sensor.py: which publish_state()
-# overload set_entity() should dispatch to (plan 3.7.1/3.7.3).
+# overload set_entity() should dispatch to.
 EntityKind = atlantic_v5_ns.enum("EntityKind", is_class=True)
 
 MODE_LISTENER = "listener"
@@ -55,13 +55,13 @@ CONF_ECHO_DRAIN = "echo_drain"
 CONF_DIR_SETUP = "dir_setup"
 CONF_DIR_HOLD = "dir_hold"
 # Referenced by the read-only-entity platform files (sensor.py etc.) to look up
-# this hub instance (plan 3.7.3's "cv.GenerateID(CONF_atlantic_v5_ID)").
+# this hub instance.
 CONF_ATLANTIC_V5_ID = "atlantic_v5_id"
 
-# ESP32-C3/S2 only have one UART port free besides the console (plan 3.5.2):
-# "MITM is unsupported on those variants; reject it at Python validation time".
+# ESP32-C3/S2 only have one UART port free besides the console, so MITM is
+# unsupported there and rejected at validation time.
 MITM_UNSUPPORTED_VARIANTS = {VARIANT_ESP32C3, VARIANT_ESP32S2}
-# Single-core targets: pinning to a specific core (plan 3.6.3's relay_core)
+# Single-core targets: pinning to a specific core (relay_core)
 # doesn't apply. xTaskCreatePinnedToCore still works with tskNO_AFFINITY, which
 # is what an unset relay_core resolves to on these variants (see to_code).
 SINGLE_CORE_VARIANTS = {
@@ -76,7 +76,7 @@ SINGLE_CORE_VARIANTS = {
     VARIANT_ESP32S2,
 }
 
-# The four bus timing defaults (ticket 17), duplicated from C++ so they show up
+# The four bus timing defaults, duplicated from C++ so they show up
 # in the resolved YAML. Keep in step with FrameAssembler::DEFAULT_SILENCE_US
 # (assembler.h), DEFAULT_ECHO_DRAIN_US (relay.h), and DEFAULT_DIR_SETUP_US /
 # DEFAULT_DIR_HOLD_US (uart_bus_io.h). dir_setup/dir_hold carry no schema
@@ -150,9 +150,9 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(AtlanticV5Component),
             cv.Optional(CONF_MODE, default=MODE_LISTENER): cv.enum(MODES, lower=True),
             cv.Optional(CONF_BUS_CAPTURE, default=False): cv.boolean,
-            # Plan 3.7.1: "If no valid frame has been seen for timeout (default
-            # 60s), publish NAN ... and mark the component failed", gated on
-            # MAIN specifically (ticket 07), not on HMI traffic.
+            # If no valid frame has been seen for timeout (default 60s),
+            # publish NAN and mark the component failed, gated on
+            # MAIN specifically, not on HMI traffic.
             cv.Optional(CONF_TIMEOUT, default="60s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_HMI): SIDE_SCHEMA,
             cv.Optional(CONF_MAIN): SIDE_SCHEMA,
@@ -160,7 +160,7 @@ CONFIG_SCHEMA = cv.All(
             # see to_code and _final_validate.
             cv.Optional(CONF_RELAY_CORE): cv.int_range(min=0, max=1),
             cv.Optional(CONF_SELF_TEST, default=True): cv.boolean,
-            # Ticket 17. frame_silence must be non-zero: at zero the backstop
+            # frame_silence must be non-zero: at zero the backstop
             # fires on every tick and no frame ever assembles.
             cv.Optional(CONF_FRAME_SILENCE, default=f"{DEFAULT_FRAME_SILENCE_US}us"): cv.All(
                 cv.positive_not_null_time_period, cv.positive_time_period_microseconds
@@ -199,7 +199,7 @@ async def to_code(config):
             ]
             cg.add(setter(*setter_args))
 
-        # plan 3.6.3: "1 on dual-core, tskNO_AFFINITY otherwise" — tskNO_AFFINITY
+        # Core 1 on dual-core targets, tskNO_AFFINITY otherwise — tskNO_AFFINITY
         # is passed through as -1 (see RelayTask::begin()).
         relay_core = config.get(CONF_RELAY_CORE)
         if relay_core is None:

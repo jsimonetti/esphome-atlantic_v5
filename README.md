@@ -5,10 +5,10 @@ serial bus between the HMI control panel and the MAIN controller board of an
 Atlantic/Thermor "V5" domestic hot water heat pump (Explorer V5 class units,
 believed to also apply to equivalent OEM-rebadged V5 units).
 
-Full protocol knowledge, architecture and the milestone plan this component
-was built against live in `.scratch/atlantic-v5/atlantic-v5-plan.md` (an
-implementer-facing spec) and `CONTEXT.md` (the domain glossary). This README
-is the user-facing companion: install, wire it up, know its limits.
+Full protocol knowledge lives in [`docs/protocol.md`](docs/protocol.md) (the
+authoritative wire-format spec) and the domain vocabulary in
+[`CONTEXT.md`](CONTEXT.md). This README is the user-facing companion: install,
+wire it up, know its limits.
 
 ## Status
 
@@ -406,9 +406,9 @@ ctest --test-dir build --output-on-failure
 
 The host test suite (`test_crc`, `test_assembler`, `test_decoder`,
 `test_relay`, `test_listener`, `test_replay_golden`) needs no ESP-IDF
-toolchain at all — it's the primary verification mechanism for everything in
-`core/`/`transport/` per the implementation plan's "test strategy without
-hardware" (1.7).
+toolchain at all — it's the primary verification mechanism for the decode and
+relay logic, which is deliberately written to compile on a host with no ESP or
+ESPHome headers so it can be tested without hardware.
 
 ## Prior art and credits
 

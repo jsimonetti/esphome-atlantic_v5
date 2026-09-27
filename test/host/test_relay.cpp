@@ -1,5 +1,5 @@
-// M5 host test (ticket 05): Relay driven purely by BusIo + a mock clock — forwarding
-// decisions, the rewrite hook (plan 2.8), echo accounting, and the silence backstop.
+// Host test: Relay driven purely by BusIo + a mock clock — forwarding
+// decisions, the rewrite hook, echo accounting, and the silence backstop.
 // No hardware, no Decoder dependency.
 #include <cstdint>
 #include <cstring>
@@ -155,12 +155,12 @@ int main() {
     CHECK(relay.hmi_stats().crc_errors == 0 && relay.main_stats().crc_errors == 0);
     CHECK(relay.hmi_stats().resyncs == 0 && relay.main_stats().resyncs == 0);
 
-    // Forwarding latency budget (plan 3.6.2): <= 1ms excluding fixed transmit time.
+    // Forwarding latency budget: <= 1ms excluding fixed transmit time.
     CHECK(relay.stats().latency_samples == rows.size());
     CHECK(relay.stats().latency_max_us <= 1000);
   }
 
-  // --- Rewrite hook (plan 2.8): the input-status frame's I2/I1 bytes are replaced
+  // --- Rewrite hook: the input-status frame's I2/I1 bytes are replaced
   // per the active control mode, byte 2 (heating status) is always copied through,
   // and the CRC is recomputed. Everything else about the frame is untouched. ---
   {
@@ -196,10 +196,10 @@ int main() {
     CHECK(found);
   }
 
-  // --- Ticket 09: changing the control_mode select (RelayPolicy::set_control_mode,
+  // --- Changing the control_mode select (RelayPolicy::set_control_mode,
   // wired from AtlanticV5Select::control()) changes the bytes the rewrite hook
-  // emits, exactly per plan 2.8's table — the host-side stand-in for the
-  // hardware loopback test this ticket's acceptance box refers to. Byte 2
+  // emits, exactly per docs/protocol.md's control surface table — the host-side
+  // stand-in for the hardware loopback test. Byte 2
   // (heating status, 0x01 in the capture) is always copied through regardless
   // of mode, and passthrough must leave the frame - and the rewrite counter -
   // untouched. ---
@@ -247,8 +247,8 @@ int main() {
     }
   }
 
-  // --- reset_latency_stats (plan 3.8: relay_latency_avg_us/max_us are "reset
-  // on read"): zeroes only the latency fields, leaving the plain cumulative
+  // --- reset_latency_stats (relay_latency_avg_us/max_us are reset
+  // on read): zeroes only the latency fields, leaving the plain cumulative
   // counters (frames_relayed, rewrites_applied, echo_bytes) untouched. ---
   {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
@@ -273,7 +273,7 @@ int main() {
     CHECK(relay.stats().frames_relayed == frames_relayed_before);  // untouched
   }
 
-  // --- Fail-safe forwarding (plan 3.9 #2 / 2.5.1): a frame with a bad CRC is
+  // --- Fail-safe forwarding: a frame with a bad CRC is
   // still forwarded raw and unmodified — the rewrite hook must never touch it,
   // and the error is counted, not silently dropped. ---
   {
@@ -312,7 +312,7 @@ int main() {
     CHECK(found_corrupted);
   }
 
-  // --- Echo accounting (plan 3.5.3): bytes arriving on a side within
+  // --- Echo accounting: bytes arriving on a side within
   // echo_drain_us of a write to that same side are our own echo — discarded,
   // counted, and never mistaken for a new frame to relay back. ---
   {
@@ -320,7 +320,7 @@ int main() {
     RelayPolicy policy;
     Relay relay(hmi_io, main_io, policy, Relay::Config{/*silence_us=*/4000, /*echo_drain_us=*/200});
 
-    // A clean payload-less HMI request (header 0164006401, plan 2.7 firmware version).
+    // A clean payload-less HMI request (header 0164006401, firmware version).
     std::vector<uint8_t> req = {0x01, 0x64, 0x00, 0x64, 0x01, 0, 0};
     append_crc(req);
 
@@ -346,7 +346,7 @@ int main() {
     CHECK(hmi_io.writes_.empty());
   }
 
-  // --- Raw capture piggyback (plan 3.5.5 MITM piggyback): the capture sink sees
+  // --- Raw capture piggyback: the capture sink sees
   // every chunk read from either side, tagged with the correct channel, including
   // the echoed chunk that echo accounting discards from framing. ---
   {
@@ -382,10 +382,10 @@ int main() {
     }
   }
 
-  // --- Cross-thread handoff (plan 3.6.5): the frame sink sees every completed
+  // --- Cross-thread handoff: the frame sink sees every completed
   // frame, tagged with its origin channel and reflecting any rewrite, and always
   // fires strictly after the corresponding write to the opposite side ("forward
-  // first, enqueue second", plan 3.9 #1). ---
+  // first, enqueue second"). ---
   {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
 

@@ -5,16 +5,17 @@
 
 namespace atlantic_v5 {
 
-// Thin, fixed-size view over one complete frame (plan 2.3). Construction from an
-// incomplete or otherwise not-yet-framed byte run is the FrameAssembler's job (M2),
-// not this class's: Frame trusts len to already delimit one candidate frame.
+// Thin, fixed-size view over one complete frame (docs/protocol.md "Frame layout").
+// Construction from an incomplete or otherwise not-yet-framed byte run is
+// FrameAssembler's job, not this class's: Frame trusts len to already delimit one
+// candidate frame.
 class Frame {
  public:
   Frame(Channel ch, const uint8_t *data, uint8_t len);
 
   Channel channel() const { return ch_; }
 
-  // The 5 header bytes as a single big-endian key, per plan 2.3 (dispatch key).
+  // The 5 header bytes as a single big-endian key (dispatch key).
   uint64_t header_key() const;
 
   // &raw()[HEADER_LEN + 1]. Only meaningful when has_payload().

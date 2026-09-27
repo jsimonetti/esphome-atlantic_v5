@@ -24,23 +24,21 @@ add_library(atlantic_v5_core
 target_include_directories(atlantic_v5_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5)
 
-# L2: hardware-free pieces (Relay plan M5, Listener plan M4) are host-compilable
-# against the abstract BusIo / core alone; uart_bus_io.cpp/relay_task.cpp
-# (M6) and bus_capture_logger.cpp (ESP32-only logging) need esp-idf and are
+# L2: the hardware-free pieces (Relay, Listener) are host-compilable
+# against the abstract BusIo / core alone; uart_bus_io.cpp, relay_task.cpp
+# and bus_capture_logger.cpp (ESP32-only logging) need esp-idf and are
 # deliberately never added here.
 add_library(atlantic_v5_transport
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/listener.cpp)
 target_link_libraries(atlantic_v5_transport PUBLIC atlantic_v5_core)
 
-# Shared behind the replay CLI (Appendix A) and test_replay_golden, so the test
+# Shared behind the replay CLI and test_replay_golden, so the test
 # exercises the exact code the CLI ships, not a reimplementation of it.
 add_library(replay_lib replay_lib.cpp)
 target_link_libraries(replay_lib PUBLIC atlantic_v5_core)
 target_include_directories(replay_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Test binaries are added here as each milestone's core/ files land:
-# test_crc (M1), test_assembler (M2), test_decoder (M3), test_relay (M5).
 add_executable(test_crc test_crc.cpp)
 target_link_libraries(test_crc PRIVATE atlantic_v5_core)
 target_include_directories(test_crc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -86,7 +84,7 @@ target_compile_definitions(test_listener PRIVATE
     CAPTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../captures")
 add_test(NAME test_listener COMMAND test_listener)
 
-# Plan 3.7.3: catalog.h's EntityId, catalog.cpp's entity_name() table and the
+# catalog.h's EntityId, catalog.cpp's entity_name() table and the
 # platform .py files' ENT_* constants are three hand-maintained lists that must
 # agree. The check is Python because two of the three sources are Python;
 # REQUIRED rather than optional so a missing interpreter fails at configure

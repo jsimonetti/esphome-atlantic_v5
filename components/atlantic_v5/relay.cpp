@@ -48,7 +48,7 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
     std::memcpy(observed, f.payload(), REWRITE_PAYLOAD_LEN);
 
   // apply() is itself a no-op on a bad-CRC or non-matching frame, which gives us
-  // the fail-safe forwarding rule (plan 2.5.1 / 3.9 #2) for free: forward first,
+  // the fail-safe forwarding rule for free: forward first,
   // exactly as received unless the rewrite hook says otherwise.
   bool rewritten = policy_.apply(f);
   out.io.write(f.raw(), f.raw_len());
@@ -63,14 +63,14 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
     frame_sink_(frame_ctx_, in_channel, f, rewritten ? observed : nullptr, now_us);
 
   // Latency here is last-byte-in (now_us, the timestamp the completed frame was
-  // detected at) to write-initiated (plan 3.6.2, excluding fixed transmit time).
+  // detected at) to write-initiated, excluding fixed transmit time.
   // out.io.now_us() is read immediately after the write, so in the synchronous
   // host model (poll() called once per row with a single timestamp for both
   // sides, MockBusIo's clock never advancing mid-call) this is still exactly 0,
-  // preserving every existing host assertion — but on real hardware (M6's
-  // RelayTask, a real clock) this now reports the actual wakeup+framing+policy
-  // overhead the relay task spent before this write, evidence plan 3.6.2 asks
-  // for instead of a permanently-stubbed 0.
+  // preserving every existing host assertion — but on real hardware (RelayTask
+  // with a real clock) this reports the actual wakeup+framing+policy
+  // overhead the relay task spent before this write, rather than a
+  // permanently-stubbed 0.
   uint32_t latency_us = out.io.now_us() - now_us;
   stats_.latency_total_us += latency_us;
   stats_.latency_samples++;

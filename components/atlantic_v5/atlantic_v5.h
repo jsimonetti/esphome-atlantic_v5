@@ -30,11 +30,10 @@ namespace esphome {
 // listener.h, ...). See build-and-tooling notes.
 namespace atlantic_v5_component {
 
-// Fixed at YAML/compile time (see implementation plan, non-goals: no automatic
-// mode detection).
+// Fixed at YAML/compile time; there is deliberately no automatic mode detection.
 enum class Mode : uint8_t { LISTENER, MITM };
 
-// Which ESPHome platform an entities_[] slot holds (plan 3.7.1/3.7.3). Only
+// Which ESPHome platform an entities_[] slot holds. Only
 // read-only entities register through this generic path (ADR 0001); the
 // control_mode select and raw_frame_dump switch are controllable and get
 // their own dedicated classes (atlantic_v5_select.h, atlantic_v5_switch.h).
@@ -51,13 +50,14 @@ class AtlanticV5Component : public Component {
   // Listener::us_since_main() without a conversion on every loop() tick.
   void set_timeout(uint32_t timeout_ms) { timeout_us_ = timeout_ms * 1000ULL; }
 
-  // Bus timing knobs (ticket 17). frame_silence is the framing backstop used
+  // Bus timing knobs. frame_silence is the framing backstop used
   // by every assembler in both modes; echo_drain is mitm-only.
   void set_frame_silence(uint32_t us) { frame_silence_us_ = us; }
   void set_echo_drain(uint32_t us) { echo_drain_us_ = us; }
 
-  // MITM-mode side wiring (plan 3.7.2/3.5.3). tx_enable_pin -1 means no DIR pin
-  // (case B); one_wire_mirror selects case C. Called once per side from to_code.
+  // MITM-mode side wiring. tx_enable_pin -1 means no DIR pin;
+  // one_wire_mirror selects the shared-pin transceiver. Called once per side from
+  // to_code.
   void set_hmi_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror,
                     uint32_t dir_setup_us, uint32_t dir_hold_us);
   void set_main_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror,
@@ -65,16 +65,16 @@ class AtlanticV5Component : public Component {
   void set_relay_core(int core) { relay_core_ = core; }
   void set_self_test(bool enabled) { self_test_ = enabled; }
 
-  // Registers a read-only entity for EntityId id (core/catalog.h). obj must
+  // Registers a read-only entity for EntityId id (catalog.h). obj must
   // outlive this component; kind selects which publish_state overload to call.
   void set_entity(uint16_t id, void *obj, EntityKind kind);
 
-  // The control_mode select's write path (plan 2.8/3.4): writes into policy_,
+  // The control_mode select's write path: writes into policy_,
   // which only Relay (mitm-only) ever reads, so it has no effect in listener
   // mode - unreachable anyway, since select.py rejects control_mode there.
   void set_control_mode(::atlantic_v5::ControlMode mode);
 
-  // The raw_frame_dump switch's write path (plan 3.8): gates whether
+  // The raw_frame_dump switch's write path: gates whether
   // already-framed, already-decoded frames get hex-dumped to a text sensor.
   void set_raw_frame_dump(bool enabled) { this->raw_frame_dump_ = enabled; }
 
@@ -93,7 +93,7 @@ class AtlanticV5Component : public Component {
   bool has_main() const;
 
 #ifdef USE_ESP32
-  // M0.5: minimal listener-mode UART bring-up feeding bus_capture (3.5.5).
+  // Listener-mode UART bring-up, also feeding bus_capture.
   uart_port_t port_{UART_NUM_1};
 
   void setup_listener();
@@ -103,20 +103,20 @@ class AtlanticV5Component : public Component {
   static void capture_sink_trampoline(void *ctx, ::atlantic_v5::Channel channel, const uint8_t *data, size_t len,
                                        uint32_t t_us);
 
-  // Diagnostic counters (plan 3.8), rate-limited to once/second; source stats
+  // Diagnostic counters, rate-limited to once/second; source stats
   // differ by mode (RelayTask/Relay/FrameAssembler in mitm, Listener in
   // listener), published through the same dedup'd publish() as decoded values.
   void update_diagnostics(uint32_t now_us);
   void publish_diag_uint(uint16_t id, uint32_t value);
   void publish_diag_float(uint16_t id, float value);
 
-  // raw_frame_dump (plan 3.8): fired for every already-framed, CRC-valid frame
+  // raw_frame_dump: fired for every already-framed, CRC-valid frame
   // in both modes - directly from loop_mitm()'s decoded FrameEvents, and via
   // Listener::FrameSink in listener mode (frame_dump_trampoline).
   void maybe_dump_frame(const ::atlantic_v5::Frame &f, uint32_t t_us);
   static void frame_dump_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
 
-  // Per-side MITM config (plan 3.7.2); unused in listener mode.
+  // Per-side MITM config; unused in listener mode.
   struct SideConfig {
     int uart_num = -1;
     int rx_pin = -1;
@@ -157,7 +157,7 @@ class AtlanticV5Component : public Component {
   int uart_num_{1};
   int rx_pin_{-1};
   int tx_pin_{-1};
-  uint32_t timeout_us_{60'000'000};  // plan 3.7.1 default 60s
+  uint32_t timeout_us_{60'000'000};  // default 60s
   uint32_t frame_silence_us_{::atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US};
   uint32_t echo_drain_us_{::atlantic_v5::DEFAULT_ECHO_DRAIN_US};
 
@@ -165,7 +165,7 @@ class AtlanticV5Component : public Component {
   void *entities_[::atlantic_v5::ENT_COUNT]{};
   EntityKind kinds_[::atlantic_v5::ENT_COUNT]{};
   // Last published numeric value per entity, for the "only publish when
-  // changed, or force_update" rule (plan 3.7.1). binary_sensor/text_sensor
+  // changed, or force_update" rule. binary_sensor/text_sensor
   // already dedupe internally in ESPHome core; sensor::Sensor does not.
   float last_published_[::atlantic_v5::ENT_COUNT];
   bool has_last_published_[::atlantic_v5::ENT_COUNT]{};

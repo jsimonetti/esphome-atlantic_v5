@@ -38,8 +38,8 @@ def _us_schema():
     )
 
 
-# key (also the message catalogue's Entity name, plan 2.7) -> (EntityId enum
-# member name in core/catalog.h, schema). Kept in this order so it's easy to
+# key (also the message catalogue's Entity name, docs/protocol.md) -> (EntityId enum
+# member name in catalog.h, schema). Kept in this order so it's easy to
 # eyeball against catalog.h's EntityId; see build-and-tooling notes on keeping
 # the two in lockstep.
 SENSORS = {
@@ -68,7 +68,7 @@ SENSORS = {
     "cycle_4_count": ("ENT_CYCLE_4_COUNT", _count_schema()),
     "cycle_5_count": ("ENT_CYCLE_5_COUNT", _count_schema()),
     "cycle_6_count": ("ENT_CYCLE_6_COUNT", _count_schema()),
-    # Diagnostics (plan 3.8), off by default: frames_ok/crc_errors/resyncs/
+    # Diagnostics, off by default: frames_ok/crc_errors/resyncs/
     # dropped_bytes are per-side totals in mitm mode, single-assembler totals
     # in listener mode (see AtlanticV5Component::update_diagnostics).
     "frames_ok": ("ENT_FRAMES_OK", _count_schema()),

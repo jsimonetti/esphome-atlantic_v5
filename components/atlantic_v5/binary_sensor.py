@@ -13,9 +13,9 @@ def _diagnostic_schema():
     return binary_sensor.binary_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
 
 
-# key (message catalogue's Entity name, plan 2.7) -> (EntityId enum member name
-# in core/catalog.h, schema). heating_active is a plain operational entity
-# (plan 3.7.2's example); the rest are diagnostic.
+# key (message catalogue's Entity name, docs/protocol.md) -> (EntityId enum member
+# name in catalog.h, schema). heating_active is a plain operational entity;
+# the rest are diagnostic.
 BINARY_SENSORS = {
     "heating_active": ("ENT_HEATING_ACTIVE", binary_sensor.binary_sensor_schema()),
     "input_i1": ("ENT_INPUT_I1", _diagnostic_schema()),
@@ -26,7 +26,7 @@ BINARY_SENSORS = {
     "cycle_4_active": ("ENT_CYCLE_4_ACTIVE", _diagnostic_schema()),
     "cycle_5_active": ("ENT_CYCLE_5_ACTIVE", _diagnostic_schema()),
     "cycle_6_active": ("ENT_CYCLE_6_ACTIVE", _diagnostic_schema()),
-    # Not decoded from a frame: the staleness gate's own state (ticket 16).
+    # Not decoded from a frame: the staleness gate's own state.
     "connected": (
         "ENT_CONNECTED",
         binary_sensor.binary_sensor_schema(

@@ -1,9 +1,9 @@
-// M3 core test (ticket 06): replay CLI output vs. frozen golden JSON, for
-// every available real capture (plan Appendix A / M3 exit criterion). Reuses
+// Core test: replay CLI output vs. frozen golden JSON, for
+// every available real capture. Reuses
 // replay_lib directly rather than shelling out to the replay binary.
 //
-// Only test/captures/real_*.csv may back a golden file here (README.md,
-// ticket 06): synthetic_*.csv and external_*.csv must never be used to
+// Only test/captures/real_*.csv may back a golden file here (see that
+// directory's README.md): synthetic_*.csv and external_*.csv must never be used to
 // freeze *.expected.json, so this test intentionally covers only the real
 // capture(s) that exist.
 #include <cstdio>

@@ -65,8 +65,8 @@ void append_value_json(std::string &out, const atlantic_v5::DecodedValue &v) {
   out += "}";
 }
 
-// One Appendix A JSON line for a single delivered, framed byte run. "values"
-// is only present when the CRC is valid (plan 2.6: never decode otherwise).
+// One JSON line for a single delivered, framed byte run. "values"
+// is only present when the CRC is valid (never decode otherwise).
 std::string format_line(uint32_t t_us, const std::string &channel_name, atlantic_v5::Channel ch, const uint8_t *data,
                          uint8_t len, atlantic_v5::Decoder &decoder) {
   atlantic_v5::Frame f(ch, data, len);
@@ -132,8 +132,8 @@ std::vector<std::string> replay_dual_bus(const std::vector<Row> &rows) {
     }
   }
 
-  // Flush any trailing partial frame on either side past the silence backstop
-  // (plan 2.5.1 #6), same as replay_single_bus does - a capture can end
+  // Flush any trailing partial frame on either side past the silence backstop,
+  // same as replay_single_bus does - a capture can end
   // mid-frame on either channel, not just on a single-wire one.
   if (last_hmi_row != nullptr) {
     uint32_t t_us = last_hmi_row->t_us + atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US + 1;

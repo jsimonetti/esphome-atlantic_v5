@@ -1,4 +1,5 @@
-// L3 ESPHome glue. The control_mode select (plan 2.8/3.4): the only entity
+// L3 ESPHome glue. The control_mode select (docs/protocol.md "Control surface"):
+// the only entity
 // whose action writes into shared runtime state (RelayPolicy), so it earns
 // its own dedicated class (ADR 0001), unlike the read-only sensor/
 // binary_sensor/text_sensor platforms.

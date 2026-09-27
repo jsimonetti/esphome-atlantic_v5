@@ -1,4 +1,4 @@
-// M1 core test (ticket 03): crc16_modbus, Frame accessors, replace_payload round-trip.
+// Core test: crc16_modbus, Frame accessors, replace_payload round-trip.
 // Host-only: reads test/captures/synthetic_*.csv, no ESP headers.
 #include <cstdint>
 #include <cstdio>
@@ -90,9 +90,9 @@ std::vector<Row> load_capture(const std::string &path) {
 }
 
 // Frame trusts its input to already delimit one candidate frame (frame.h); this
-// mirrors the length rules of plan 2.3/2.5 just enough to tell a genuinely
+// mirrors the frame layout and framing length rules just enough to tell a genuinely
 // complete row (payload-less, or a payload frame with all its bytes present)
-// apart from the deliberately truncated fixture row, which is M2's concern.
+// apart from the deliberately truncated fixture row, which is FrameAssembler's concern.
 bool is_complete_frame(const std::vector<uint8_t> &bytes) {
   if (bytes.size() == atlantic_v5::HEADER_LEN + 2)
     return true;  // payload-less: header + CRC
@@ -118,7 +118,7 @@ int main() {
 
   for (const auto &row : rows) {
     if (!is_complete_frame(row.bytes))
-      continue;  // deliberately truncated fixture row (M2 territory), skip
+      continue;  // deliberately truncated fixture row (FrameAssembler's territory), skip
     complete_frames++;
 
     atlantic_v5::Frame f(row.channel, row.bytes.data(), static_cast<uint8_t>(row.bytes.size()));
@@ -144,8 +144,8 @@ int main() {
   CHECK(complete_frames >= 20);
   CHECK(payload_less_frames >= 3);
 
-  // replace_payload round-trip: modify, recompute, verify (ticket 03 checklist).
-  // 0x0164FEB006 water-temperature response, 12-byte payload (plan 2.7).
+  // replace_payload round-trip: modify, recompute, verify.
+  // 0x0164FEB006 water-temperature response, 12-byte payload.
   const uint8_t original[] = {0x01, 0x64, 0xFE, 0xB0, 0x06, 0x0C, 0x11, 0xD7, 0x14,
                                0x6E, 0x07, 0x3A, 0x02, 0x0D, 0x01, 0xFE, 0x01, 0xF4, 0x90, 0x2D};
   atlantic_v5::Frame f(atlantic_v5::Channel::MAIN, original, sizeof(original));

@@ -30,7 +30,6 @@ void UartBusIo::install() {
   }
 
   if (this->cfg_.one_wire_mirror) {
-    // Plan 3.5.3: tx_sig/rx_sig = uart_periph_signal[port].pins[SOC_UART_{TX,RX}_PIN_IDX].signal.
     this->tx_sig_ = uart_periph_signal[this->cfg_.port].pins[SOC_UART_TX_PIN_IDX].signal;
     this->rx_sig_ = uart_periph_signal[this->cfg_.port].pins[SOC_UART_RX_PIN_IDX].signal;
   }
@@ -76,7 +75,7 @@ void UartBusIo::set_line_mode(LineMode mode) {
 
   if (mode == LineMode::TX) {
     // Mirror the TX signal onto both pins so it reaches the bus regardless of
-    // which transceiver channel is physically wired to it (plan 3.5.3 case C).
+    // which transceiver channel is physically wired to it.
     gpio_set_direction(tx_pin, GPIO_MODE_OUTPUT);
     esp_rom_gpio_connect_out_signal(tx_pin, this->tx_sig_, false, false);
     gpio_set_direction(rx_pin, GPIO_MODE_INPUT_OUTPUT);

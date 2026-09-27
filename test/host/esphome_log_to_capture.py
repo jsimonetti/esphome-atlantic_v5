@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turn `esphome logs` output into a canonical test/captures/*.csv file.
 
-The component's `bus_capture: true` option (plan 3.5.5) logs one line per
+The component's `bus_capture: true` option logs one line per
 byte-chunk under the `atlantic_v5.bus_capture` tag:
 
     [12:34:56][I][atlantic_v5.bus_capture:031]: BUSCAP,4808918,bus,0165000301...

@@ -1,9 +1,8 @@
-// L2 transport, esp-idf only. Raw pre-assembly byte+timestamp capture logging
-// (plan 3.5.5), independent of FrameAssembler/Decoder/RelayPolicy. Extracted from
-// ticket 07's listener-mode-only implementation so ticket 08's MITM piggyback
-// (one instance per side, tagged "hmi"/"main") can share the same accumulate-on-
-// silence-backstop logic instead of reimplementing it, per channel tag ("bus" for
-// listener mode's single tapped wire).
+// L2 transport, esp-idf only. Raw pre-assembly byte+timestamp capture logging,
+// independent of FrameAssembler/Decoder/RelayPolicy. Shared by both modes: MITM
+// runs one instance per side (tagged "hmi"/"main"), listener one for its single
+// tapped wire (tagged "bus"), so the accumulate-on-silence-backstop logic lives
+// in one place.
 #pragma once
 
 #ifdef USE_ESP32
@@ -19,8 +18,8 @@ class BusCaptureLogger {
   explicit BusCaptureLogger(const char *channel_tag) : channel_tag_(channel_tag) {}
 
   // Accumulates chunk into the current candidate frame and flushes (logs) it once
-  // the plan's 4ms silence backstop (2.1/2.5.1) elapses or the buffer would
-  // otherwise overflow. Frames are variable-length (plan 2.3), so there's no fixed
+  // the 4ms silence backstop elapses or the buffer would
+  // otherwise overflow. Frames are variable-length, so there's no fixed
   // size to log in one shot; call every time bytes are read, even len == 0, so the
   // silence backstop still fires with no new bytes.
   void feed(const uint8_t *chunk, size_t len, int64_t now_us);

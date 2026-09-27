@@ -9,9 +9,9 @@
 namespace atlantic_v5 {
 
 namespace {
-constexpr size_t EVENTS_QUEUE_LEN = 24;      // plan 3.6.5
-constexpr uint32_t LISTEN_WINDOW_US = 3'000'000;  // plan 3.5.4 step 1: "wait 3s"
-constexpr TickType_t RELAY_BLOCK_TICKS = pdMS_TO_TICKS(2);  // plan 3.6.1
+constexpr size_t EVENTS_QUEUE_LEN = 24;
+constexpr uint32_t LISTEN_WINDOW_US = 3'000'000;  // self-test listen window
+constexpr TickType_t RELAY_BLOCK_TICKS = pdMS_TO_TICKS(2);
 }  // namespace
 
 static const char *const TAG = "atlantic_v5.relay_task";
@@ -32,7 +32,7 @@ void RelayTask::begin() {
 
   this->events_ = xQueueCreate(EVENTS_QUEUE_LEN, sizeof(FrameEvent));
 
-  this->run_self_test();  // never gates task startup, plan 3.5.4 step 3
+  this->run_self_test();  // never gates task startup
 
   // Set size must be >= the sum of both member queues' lengths (16 each, set in
   // UartBusIo::install()'s uart_driver_install call).
@@ -50,7 +50,7 @@ void RelayTask::task_entry(void *arg) {
 }
 
 void RelayTask::run() {
-  // Plan 3.6.1/3.6.4: always block (xQueueSelectFromSet with a bounded timeout),
+  // Always block (xQueueSelectFromSet with a bounded timeout),
   // never a bare uart_get_buffered_data_len() spin, and never subscribed to the
   // task watchdog (a hang here means a dead bus, which the peers report
   // themselves, not a reason to reboot mid-appliance-bus).
@@ -62,7 +62,7 @@ void RelayTask::run() {
     }
     // relay_.poll() does its own uart_read_bytes/write regardless of which port's
     // event woke us (or none, on a plain timeout) — the event is only a wakeup
-    // signal, never a source of data (plan 3.6.1 #1-2).
+    // signal, never a source of data.
     this->relay_.poll(this->hmi_io_.now_us());
   }
 }
@@ -84,7 +84,7 @@ void RelayTask::push_event(Channel channel, const Frame &f, const uint8_t *obser
   if (observed_payload != nullptr)
     memcpy(ev.observed_payload, observed_payload, REWRITE_PAYLOAD_LEN);
 
-  // Plan 3.6.5: on failure, count and drop — forwarding has already happened by
+  // On failure, count and drop — forwarding has already happened by
   // this point (this runs from Relay's frame sink, called after the write), so a
   // dropped event never affects forwarding.
   if (xQueueSend(this->events_, &ev, 0) != pdTRUE)
@@ -99,7 +99,7 @@ size_t RelayTask::drain_events(FrameEvent *out, size_t max_events) {
 }
 
 void RelayTask::run_self_test() {
-  // Step 1 (plan 3.5.4): both sides already parked in RX by install(); confirm
+  // Step 1: both sides already parked in RX by install(); confirm
   // something is arriving on at least one side before deciding anything further.
   uint32_t start_us = this->hmi_io_.now_us();
   bool hmi_seen = false, main_seen = false;
@@ -152,7 +152,7 @@ void RelayTask::run_self_test() {
   }
 
   // Step 2: transmit a repeat of an already-seen payload-less header and check
-  // whether it echoes back on that same side (plan 3.5.4 step 2). Never forwarded
+  // whether it echoes back on that same side. Never forwarded
   // through RelayPolicy/the opposite side — this is a probe, not relayed traffic.
   bool hmi_can_drive = false, main_can_drive = false;
   if (hmi_probe_len > 0) {

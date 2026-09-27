@@ -9,8 +9,8 @@
 
 namespace atlantic_v5 {
 
-// Emitted by Decoder::decode, one per catalogued value inside a frame's payload
-// (plan 3.3). id is an EntityId (core/catalog.h); kept as a raw uint16_t here so
+// Emitted by Decoder::decode, one per catalogued value inside a frame's payload.
+// id is an EntityId (catalog.h); kept as a raw uint16_t here so
 // this header doesn't need to depend on catalog.h.
 struct DecodedValue {
   enum class Kind : uint8_t { FLOAT, BOOL, TEXT, UINT } kind;
@@ -21,9 +21,9 @@ struct DecodedValue {
   char text[24] = {};
 };
 
-// The seven payload codecs (plan 2.6), each operating on a caller-validated
-// payload pointer. Exposed individually so each is unit-testable on its own,
-// independent of header dispatch.
+// The seven payload codecs (docs/protocol.md "Payload codecs"), each operating on a
+// caller-validated payload pointer. Exposed individually so each is unit-testable on
+// its own, independent of header dispatch.
 namespace codec {
 
 // int16 big endian, hundredths of a degree Celsius.
@@ -37,7 +37,7 @@ bool decode_bool(const uint8_t *b);
 
 // Copies up to len bytes until the first NUL into out (NUL-terminated, capacity
 // out_len). Returns false, leaving out untouched, if the payload's last byte
-// isn't 0x00 (plan 2.6: "reject if the last payload byte is not 0x00").
+// isn't 0x00.
 bool decode_text(const uint8_t *b, uint8_t len, char *out, size_t out_len);
 
 // 5-byte `00 <min:int16> <max:int16>`. Returns false, leaving min_c/max_c
@@ -45,7 +45,7 @@ bool decode_text(const uint8_t *b, uint8_t len, char *out, size_t out_len);
 bool decode_minmax(const uint8_t *b, float *min_c, float *max_c);
 
 // Three uint32 BE: secs_in_state0, secs_in_state1, cycle_count. active is
-// secs_in_state1 > 0 (plan 2.6 cycle triplet semantics).
+// secs_in_state1 > 0.
 struct Cycle {
   bool active;
   uint32_t count;
@@ -54,16 +54,16 @@ Cycle decode_cycle(const uint8_t *b);
 
 }  // namespace codec
 
-// Header dispatch + DecodedValue emission for the message catalogue (plan 3.3).
+// Header dispatch + DecodedValue emission for the message catalogue.
 class Decoder {
  public:
   using Sink = void (*)(void *ctx, const DecodedValue &);
 
-  // Dispatches on f.header_key(). Never decodes a frame whose CRC failed (plan
-  // 2.6). Validates the payload before decoding, and never decodes one
+  // Dispatches on f.header_key(). Never decodes a frame whose CRC failed.
+  // Validates the payload before decoding, and never decodes one
   // partially: fixed-offset codecs require the header's exact catalogued
   // length, while a text field only has to fit the frame as received and end
-  // in 0x00 (ticket 19). A rejected payload counts as
+  // in 0x00. A rejected payload counts as
   // stats().length_mismatches; a text field accepted at a width the catalogue
   // does not describe is published and counts as stats().text_length_variants.
   // A header in header::UNMAPPED counts as stats().unmapped_frames; one in
@@ -80,7 +80,7 @@ class Decoder {
     // Structural rejections: nothing was published for the frame.
     uint32_t length_mismatches = 0;
     // A text field whose declared width differs from the catalogue's, but which
-    // was still structurally valid and therefore published (ticket 19). Not a
+    // was still structurally valid and therefore published. Not a
     // rejection - it flags a firmware revision this catalogue does not describe.
     uint32_t text_length_variants = 0;
     // The most recent frame that hit either of the two counters above, so the
@@ -90,8 +90,8 @@ class Decoder {
     uint64_t last_length_anomaly_header = 0;
     uint8_t last_length_anomaly_expected = 0;
     uint8_t last_length_anomaly_actual = 0;
-    // The most recent header_key() that fell to the unknown-header case (plan
-    // 3.8's last_unknown_frame diagnostic). 0 (never a valid header, byte 0 is
+    // The most recent header_key() that fell to the unknown-header case, for the
+    // last_unknown_frame diagnostic. 0 (never a valid header, byte 0 is
     // always 0x01) until the first unknown header is seen.
     uint64_t last_unknown_header = 0;
     // That frame's payload, so the diagnostic can show what the unrecognised

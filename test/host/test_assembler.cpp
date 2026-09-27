@@ -1,4 +1,4 @@
-// M2 core test (ticket 04): FrameAssembler dual-bus and single-bus framing paths.
+// Core test: FrameAssembler dual-bus and single-bus framing paths.
 // Host-only: reads test/captures/synthetic_*.csv, no ESP headers.
 #include <cstdint>
 #include <cstdio>
@@ -60,7 +60,7 @@ std::vector<Row> load_capture(const std::string &path) {
 }
 
 // Feeds one row's bytes through an assembler, using the row timestamp for every byte
-// (captures only record the arrival time of a frame's last byte, plan 3.5.5). Appends
+// (captures only record the arrival time of a frame's last byte). Appends
 // any delivered frame's raw bytes to `out`.
 void feed_row(atlantic_v5::FrameAssembler &asm_, const Row &row, std::vector<std::vector<uint8_t>> &out) {
   for (uint8_t b : row.bytes) {
@@ -130,7 +130,7 @@ int main() {
     CHECK(stats.speculative_accepts > 0);
 
     // The frame immediately after the corrupted+truncated pair must be the clean
-    // resync header (0164FEC603, plan 2.7 evaporator_2 min/max) - proves the bad
+    // resync header (0164FEC603, evaporator_2 min/max) - proves the bad
     // frames were fully recovered from, not left desynced.
     bool found_resync_header = false;
     for (const auto &frame : delivered) {
@@ -145,8 +145,8 @@ int main() {
     CHECK(found_resync_header);
   }
 
-  // --- Injected silence threshold (plan 3.2: "passed in at construction so tests
-  // can vary it"): a shorter threshold backstops sooner than the default. ---
+  // --- Injected silence threshold: a shorter threshold backstops sooner
+  // than the default. ---
   {
     const uint8_t partial_frame[] = {0x01, 0x65, 0xFE, 0xB0, 0x06, 0x02, 0xAA};  // incomplete payload frame
 

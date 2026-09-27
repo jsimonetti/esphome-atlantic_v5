@@ -1,4 +1,4 @@
-// Capture replay CLI (plan Appendix A). Loads one or more capture CSVs,
+// Capture replay CLI. Loads one or more capture CSVs,
 // assembles + decodes frames per the chosen mode, and prints one JSON object
 // per delivered frame to stdout, in input order.
 #include <cstdio>
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     } else if (arg == "--main-channel") {
       main_channel = next("--main-channel");
     } else if (arg == "--json") {
-      continue;  // JSON is the only output format; accepted for Appendix A CLI compatibility
+      continue;  // JSON is the only output format; accepted for CLI compatibility
     } else {
       std::fprintf(stderr, "unknown argument: %s\n", arg.c_str());
       print_usage();

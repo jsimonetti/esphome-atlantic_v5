@@ -8,9 +8,9 @@
 
 namespace atlantic_v5 {
 
-// The only rewrite the codebase is allowed to perform (plan 2.8: the input-status
-// frame). control_mode() is written from the main loop and read from the relay
-// task/thread, hence the atomic rather than a lock.
+// The only rewrite the codebase is allowed to perform: the input-status frame
+// (docs/protocol.md "Control surface"). control_mode() is written from the main loop
+// and read from the relay task/thread, hence the atomic rather than a lock.
 class RelayPolicy {
  public:
   static constexpr uint64_t INPUT_STATUS_HEADER_KEY = 0x0164FF1403ULL;

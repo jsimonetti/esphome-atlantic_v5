@@ -1,4 +1,4 @@
-// M3 core test (ticket 06): payload codecs + Decoder header dispatch/catalog.
+// Core test: payload codecs + Decoder header dispatch/catalog.
 // Host-only: reads test/captures/synthetic_*.csv, no ESP headers.
 #include <cstdint>
 #include <cstdio>
@@ -64,7 +64,7 @@ std::vector<Row> load_capture(const std::string &path) {
 // Assembles every row of a capture (dual_bus per the row's own HMI/MAIN channel,
 // or a single BUS assembler for a listener-style capture) and returns each
 // delivered frame as a Frame, in delivery order. Mirrors test_assembler.cpp's
-// feed_row helper; framing itself is M2's concern, not this test's.
+// feed_row helper; framing itself is test_assembler's concern, not this test's.
 std::vector<atlantic_v5::Frame> assemble_capture(const std::vector<Row> &rows, bool dual_bus) {
   atlantic_v5::FrameAssembler hmi(atlantic_v5::Channel::HMI, dual_bus);
   atlantic_v5::FrameAssembler main_asm(atlantic_v5::Channel::MAIN, dual_bus);
@@ -205,9 +205,10 @@ int main() {
   CHECK(std::strcmp(atlantic_v5::entity_name(atlantic_v5::ENT_HMI_MODEL), "hmi_model") == 0);
 
   // --- Decoder dispatch, driven off the two synthetic captures already used by
-  // M1/M2 (dual-bus + single-bus), so expected values are the same literals the
+  // test_crc/test_assembler (dual-bus + single-bus), so expected values are the same
+  // literals the
   // capture generator used to build the fixtures (an independent source: the
-  // worked examples in plan 2.7), not recomputed by the code under test. ---
+  // worked examples in docs/protocol.md), not recomputed by the code under test. ---
   {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
     auto frames = assemble_capture(rows, /*dual_bus=*/true);
@@ -246,7 +247,7 @@ int main() {
     // table (docs/protocol.md), so they are routine traffic, not anomalies.
     // The 5 payload-less READ requests for known headers (FEB006, FEBA03,
     // FF1403, FEE203, 006401) are silently skipped, not counted as unknown or
-    // as a length mismatch (plan 2.2: the request side of a READ carries no
+    // as a length mismatch (the request side of a READ carries no
     // payload by design, that's not an anomaly).
     CHECK(decoder.stats().unmapped_frames == 4);
     CHECK(decoder.stats().unknown_headers == 0);
@@ -255,7 +256,7 @@ int main() {
   }
   {
     // --- A capture of nothing but unmapped traffic must leave the
-    // unknown-frame diagnostics completely untouched (ticket 11). ---
+    // unknown-frame diagnostics completely untouched. ---
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_unmapped_only.csv");
     auto frames = assemble_capture(rows, /*dual_bus=*/true);
     CHECK(frames.size() == rows.size());
@@ -283,7 +284,7 @@ int main() {
     CHECK(!atlantic_v5::is_unmapped_header(0));
   }
   {
-    // --- last_unknown_header/_payload (plan 3.8's last_unknown_frame
+    // --- last_unknown_header/_payload (behind the last_unknown_frame
     // diagnostic): remembers the most recent header that was in *neither*
     // table, as a raw uint64_t key plus its payload, ready for hex formatting
     // by the caller. ---
@@ -359,8 +360,8 @@ int main() {
     CHECK(find(all, atlantic_v5::ENT_EVAPORATOR_2_TEMPERATURE_MIN)->f == 5.00f);
     CHECK(find(all, atlantic_v5::ENT_EVAPORATOR_2_TEMPERATURE_MAX)->f == 7.00f);
 
-    // The deliberately corrupted 0164FEB006 frame (bad CRC, plan 2.6 "never
-    // decode a frame whose CRC failed") must not emit a second water_temperature.
+    // The deliberately corrupted 0164FEB006 frame (bad CRC, never
+    // decode a frame whose CRC failed) must not emit a second water_temperature.
     int water_temp_count = 0;
     for (const auto &v : all.values)
       if (v.id == atlantic_v5::ENT_WATER_TEMPERATURE)
@@ -369,7 +370,7 @@ int main() {
   }
 
   // --- Text payload length is gated structurally, not pinned to the catalogue
-  // width (ticket 19): a NUL-terminated field that fits the buffered frame and
+  // width: a NUL-terminated field that fits the buffered frame and
   // DecodedValue::text is published and counted as a variant; anything that
   // would read past the frame, overflow the text buffer, or lack a terminator
   // is rejected and counted as a mismatch. ---
@@ -515,7 +516,7 @@ int main() {
     CHECK(decoder.stats().last_length_anomaly_actual == 3);
   }
 
-  // --- The seven mapped headers that appear in no capture fixture (ticket 14):
+  // --- The seven mapped headers that appear in no capture fixture:
   // compressor_outlet / air_inlet / evaporator_3 minmax, and cycles 3-6. Frames
   // are built here rather than replayed, so a wrong entity id in the dispatch
   // cannot hide behind a golden baseline. Payloads are hand-encoded from
@@ -572,8 +573,8 @@ int main() {
   }
 
   // --- header::MAPPED and decode()'s case labels are two hand-maintained
-  // lists with nothing tying them together (ticket 14). A payload-less frame
-  // for a mapped header is silently skipped by design (plan 2.2: the request
+  // lists with nothing tying them together. A payload-less frame
+  // for a mapped header is silently skipped by design (the request
   // side of a READ carries no payload), so any MAPPED key lacking a dispatch
   // arm falls to default: and shows up as an unknown or unmapped frame. ---
   {

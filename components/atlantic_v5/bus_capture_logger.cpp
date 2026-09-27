@@ -10,7 +10,7 @@ namespace esphome {
 namespace atlantic_v5_component {
 
 namespace {
-constexpr int64_t CAPTURE_SILENCE_US = 4000;  // plan 2.1/2.5.1's backstop, reused as-is
+constexpr int64_t CAPTURE_SILENCE_US = 4000;  // the framing backstop, reused as-is
 
 // Uppercase hex, no separators, matching the test/captures/*.csv hex column.
 void to_hex(const uint8_t *data, size_t len, char *out) {

@@ -28,7 +28,7 @@ void to_hex(const uint8_t *data, size_t len, char *out) {
 }
 
 // The 5-byte header key as 10 uppercase hex chars, matching entity/log
-// conventions elsewhere (plan 2.3's big-endian key).
+// conventions elsewhere.
 void format_header_hex(uint64_t key, char *out) {
   uint8_t bytes[::atlantic_v5::HEADER_LEN];
   for (size_t i = 0; i < ::atlantic_v5::HEADER_LEN; i++)
@@ -164,8 +164,8 @@ void AtlanticV5Component::setup_mitm() {
   }
   this->relay_task_->begin();
 
-  // plan 3.5.4 #3: "Publish the result as a diagnostic text sensor ... Never
-  // block the relay on the self-test outcome" - begin() already ran it
+  // The self-test result is published as a diagnostic text sensor and never
+  // blocks the relay: begin() already ran it
   // synchronously before spawning the relay task, so the result is ready now.
   void *self_test_obj = this->entities_[::atlantic_v5::ENT_SELF_TEST_RESULT];
   if (self_test_obj != nullptr && this->kinds_[::atlantic_v5::ENT_SELF_TEST_RESULT] == EntityKind::TEXT_SENSOR)
@@ -173,15 +173,15 @@ void AtlanticV5Component::setup_mitm() {
 }
 
 void AtlanticV5Component::loop_mitm() {
-  ::atlantic_v5::FrameEvent events[8];  // plan 3.6.5: N=8, bounds loop time
+  ::atlantic_v5::FrameEvent events[8];  // N=8 per iteration, bounds loop time
   size_t n = this->relay_task_->drain_events(events, 8);
   for (size_t i = 0; i < n; i++) {
     const auto &ev = events[i];
     if (!ev.crc_ok)
       continue;  // still forwarded on the wire (fail-safe); just not decoded
     ::atlantic_v5::Frame f(ev.channel, ev.data, ev.len);
-    // Transaction-byte rule (plan 2.2): only MAIN's payload-bearing response
-    // resets the staleness gate, matching ticket 07's listener-mode semantics.
+    // Transaction-byte rule: only MAIN's payload-bearing response
+    // resets the staleness gate, matching listener mode's semantics.
     if (ev.channel == ::atlantic_v5::Channel::MAIN && f.has_payload()) {
       this->last_main_us_ = ev.t_us;
       this->seen_main_ = true;
@@ -219,7 +219,7 @@ void AtlanticV5Component::publish_diag_float(uint16_t id, float value) {
 }
 
 void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
-  if (now_us - this->last_diag_us_ < 1'000'000)  // plan 3.8: no cadence specified, 1s matches the bus's own rate
+  if (now_us - this->last_diag_us_ < 1'000'000)  // 1s matches the bus's own rate
     return;
   this->last_diag_us_ = now_us;
 
@@ -271,17 +271,16 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   this->publish_diag_float(::atlantic_v5::ENT_RELAY_LATENCY_AVG_US, latency_avg_us);
   this->publish_diag_uint(::atlantic_v5::ENT_TASK_STACK_FREE, task_stack_free);
 
-  // plan 3.8: "reset on read" - each published latency value covers only the
+  // Latency stats are reset on read: each published value covers only the
   // window since the previous diagnostics tick, not the time since boot.
   if (this->mode_ == Mode::MITM)
     this->relay_task_->reset_latency_stats();
 
-  // Payload-length anomalies (ticket 19). The counters above are the durable
+  // Payload-length anomalies. The counters above are the durable
   // record; this names the offending header so a divergent firmware produces an
   // actionable bug report rather than a number nobody can interpret. Keyed on
   // the header, so a firmware that disagrees on one field logs once and not
-  // once per poll. Logged here, never from the decoder - L1 does not log (plan
-  // 3.6.4).
+  // once per poll. Logged here, never from the decoder - L1 does not log.
   if (dec_stats->last_length_anomaly_header != this->last_logged_anomaly_header_ &&
       now_us - this->last_length_anomaly_us_ >= 10'000'000) {
     this->last_logged_anomaly_header_ = dec_stats->last_length_anomaly_header;
@@ -295,7 +294,7 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
              dec_stats->length_mismatches, dec_stats->text_length_variants);
   }
 
-  // last_unknown_frame: rate-limited to once/10s (plan 3.8), and only when a
+  // last_unknown_frame: rate-limited to once/10s, and only when a
   // *new* unknown header has actually appeared since the last time we looked.
   // Unmapped headers (docs/protocol.md) never reach this counter, so it only
   // moves for traffic we have genuinely never seen before.
@@ -325,7 +324,7 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
 void AtlanticV5Component::maybe_dump_frame(const ::atlantic_v5::Frame &f, uint32_t t_us) {
   if (!this->raw_frame_dump_)
     return;
-  if (t_us - this->last_frame_dump_us_ < 200'000)  // rate-limited (plan 3.8), 200ms
+  if (t_us - this->last_frame_dump_us_ < 200'000)  // rate-limited, 200ms
     return;
   this->last_frame_dump_us_ = t_us;
 
@@ -398,7 +397,7 @@ void AtlanticV5Component::publish(const ::atlantic_v5::DecodedValue &v) {
 }
 
 void AtlanticV5Component::update_staleness(uint32_t now_us) {
-  // The one place that decides "stale" (ticket 16): the NAN publish, the
+  // The one place that decides "stale": the NAN publish, the
   // component warning and the `connected` entity are three presentations of
   // this single result, never three clocks.
   bool is_stale = !this->has_main() || this->us_since_main(now_us) >= this->timeout_us_;

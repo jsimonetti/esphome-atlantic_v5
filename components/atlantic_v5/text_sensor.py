@@ -8,8 +8,8 @@ from . import CONF_ATLANTIC_V5_ID, AtlanticV5Component, EntityKind
 DEPENDENCIES = ["atlantic_v5"]
 CODEOWNERS = ["@jsimonetti"]
 
-# key (message catalogue's Entity name, plan 2.7) -> EntityId enum member name
-# in core/catalog.h. All diagnostic: version/model/serial info, not telemetry.
+# key (message catalogue's Entity name, docs/protocol.md) -> EntityId enum member
+# name in catalog.h. All diagnostic: version/model/serial info, not telemetry.
 TEXT_SENSORS = {
     "firmware_version": "ENT_FIRMWARE_VERSION",
     "serial_number": "ENT_SERIAL_NUMBER",
@@ -17,10 +17,10 @@ TEXT_SENSORS = {
     "controller_model": "ENT_CONTROLLER_MODEL",
     "hmi_version": "ENT_HMI_VERSION",
     "hmi_model": "ENT_HMI_MODEL",
-    # Diagnostics (plan 3.8), off by default.
+    # Diagnostics, off by default.
     "last_unknown_frame": "ENT_LAST_UNKNOWN_FRAME",
     "last_frame_dump": "ENT_LAST_FRAME_DUMP",
-    # Startup self-test result (plan 3.5.4 #3), mitm-only; never published in
+    # Startup self-test result, mitm-only; never published in
     # listener mode (RelayTask doesn't exist there).
     "self_test_result": "ENT_SELF_TEST_RESULT",
 }

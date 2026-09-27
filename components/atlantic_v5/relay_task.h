@@ -1,5 +1,5 @@
-// L2 transport, esp-idf only (plan 3.6). Owns the two UartBusIo sides and the
-// hardware-free Relay (M5) together, and is the only place FreeRTOS task/queue
+// L2 transport, esp-idf only. Owns the two UartBusIo sides and the
+// hardware-free Relay together, and is the only place FreeRTOS task/queue
 // specifics live — Relay itself stays host-testable with MockBusIo.
 #pragma once
 
@@ -22,23 +22,23 @@ class RelayTask {
     UartBusIoConfig hmi;
     UartBusIoConfig main;
     Relay::Config relay{};
-    int relay_core = 1;    // plan 3.6.3; -1 == tskNO_AFFINITY (single-core targets)
-    bool self_test = true;  // plan 3.5.4
+    int relay_core = 1;    // -1 == tskNO_AFFINITY (single-core targets)
+    bool self_test = true;
   };
 
   RelayTask(const Config &cfg, RelayPolicy &policy);
 
-  // Optional, must be called before begin() (plan 3.5.5 MITM piggyback): raw
+  // Optional, must be called before begin() (MITM capture piggyback): raw
   // pre-assembly bytes read by the relay task are handed to sink as a byproduct,
   // tagged with the physical side they came from.
   void set_capture_sink(Relay::CaptureSink sink, void *ctx) { this->relay_.set_capture_sink(sink, ctx); }
 
-  // Brings up both UARTs, runs the startup self-test (3.5.4), and spawns the
-  // pinned relay task (3.6.3). Call once from Component::setup().
+  // Brings up both UARTs, runs the startup self-test, and spawns the
+  // pinned relay task. Call once from Component::setup().
   void begin();
 
-  // Drains up to max_events completed frames into out (plan 3.6.5: "drain up to
-  // N events per iteration"). Call only from the main loop/thread.
+  // Drains up to max_events completed frames into out. Call only from the main
+  // loop/thread.
   size_t drain_events(FrameEvent *out, size_t max_events);
 
   const Relay::Stats &stats() const { return this->relay_.stats(); }
@@ -47,8 +47,8 @@ class RelayTask {
   const FrameAssembler::Stats &main_stats() const { return this->relay_.main_stats(); }
   void reset_latency_stats() { this->relay_.reset_latency_stats(); }
 
-  // High-water mark of unused stack, in bytes, for the diagnostic in plan 3.6.3
-  // ("measure with uxTaskGetStackHighWaterMark"). 0 before begin() spawns the task.
+  // High-water mark of unused stack, in bytes, for the task_stack_free
+  // diagnostic. 0 before begin() spawns the task.
   uint32_t stack_high_water_mark() const {
     return this->handle_ != nullptr ? static_cast<uint32_t>(uxTaskGetStackHighWaterMark(this->handle_)) * sizeof(StackType_t)
                                      : 0;

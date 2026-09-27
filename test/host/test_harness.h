@@ -1,5 +1,5 @@
-// Minimal assert-based test harness for L1 core tests (plan 1.7 level 1: no
-// GoogleTest dependency, no ESP headers, no exceptions).
+// Minimal assert-based test harness for L1 core tests: no
+// GoogleTest dependency, no ESP headers, no exceptions.
 #pragma once
 
 #include <cstdio>

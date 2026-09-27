@@ -1,6 +1,6 @@
-// L2 transport. Abstract IO boundary (plan 3.5.1): Relay only ever sees this
-// interface, never a concrete UART or mock directly, which is what makes M5
-// (Relay logic) verifiable on a host with no hardware and no ESPHome headers.
+// L2 transport. Abstract IO boundary: Relay only ever sees this
+// interface, never a concrete UART or mock directly, which is what makes the relay
+// logic verifiable on a host with no hardware and no ESPHome headers.
 #pragma once
 
 #include <cstddef>

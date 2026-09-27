@@ -1,5 +1,5 @@
-// L2 transport, hardware-free listener-mode glue (plan M4 / 3.7.1). Wraps the
-// single tapped-bus FrameAssembler (2.5.2 speculative-CRC framing) and the
+// L2 transport, hardware-free listener-mode glue. Wraps the
+// single tapped-bus FrameAssembler (speculative-CRC single-bus framing) and the
 // Decoder, and tracks the MAIN-quiet staleness gate independently of HMI
 // traffic. Verifiable on a host with no ESPHome headers: L3 feeds it bytes
 // from the UART and a sink from a publish callback; tests feed it bytes
@@ -22,9 +22,9 @@ class Listener {
     ctx_ = ctx;
   }
 
-  // Raw already-framed, CRC-valid frame hook (plan 3.8's raw_frame_dump),
+  // Raw already-framed, CRC-valid frame hook (feeds raw_frame_dump),
   // fired for every complete frame regardless of whether Decoder recognises
-  // its header - mirrors Relay::FrameSink (ticket 08) so both modes share the
+  // its header - mirrors Relay::FrameSink so both modes share the
   // same "who gets to see a completed frame" shape.
   using FrameSink = void (*)(void *ctx, const Frame &f, uint32_t t_us);
   void set_frame_sink(FrameSink sink, void *ctx) {
@@ -34,21 +34,21 @@ class Listener {
 
   // Feeds one byte from the tapped bus. Decodes and publishes through the sink
   // whenever a complete, CRC-valid frame closes; a bad CRC is fail-safe
-  // discarded (plan 2.5.2 #4 already resyncs the assembler on this path).
+  // discarded (single-bus framing already resyncs the assembler on this path).
   void push_byte(uint8_t byte, uint32_t t_us);
 
   // Call every loop tick, even with no new bytes: applies the assembler's
-  // silence backstop (2.1/2.5.1) so a partially-buffered frame doesn't wedge
+  // silence backstop so a partially-buffered frame doesn't wedge
   // the staleness gate open forever.
   void tick(uint32_t t_us);
 
-  // The frame_silence knob (ticket 17). Set before the first push_byte().
+  // The frame_silence knob. Set before the first push_byte().
   void set_silence_us(uint32_t us) { assembler_.set_silence_us(us); }
 
   // Microseconds since the last CRC-valid, payload-bearing MAIN-origin frame
-  // (plan 2.2: a payload-bearing 0x64 frame can only be MAIN's response - HMI's
+  // (a payload-bearing 0x64 frame can only be MAIN's response - HMI's
   // 0x64 requests are always payload-less). Callers compare this against their
-  // own configured timeout; HMI-only traffic never resets it (ticket 07).
+  // own configured timeout; HMI-only traffic never resets it.
   uint32_t us_since_main(uint32_t t_us) const { return t_us - last_main_us_; }
 
   // Whether any such frame has been seen at all. us_since_main() can't say:

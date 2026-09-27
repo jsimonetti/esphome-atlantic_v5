@@ -15,7 +15,8 @@ AtlanticV5Select = atlantic_v5_ns.class_("AtlanticV5Select", select.Select, cg.C
 
 CONF_CONTROL_MODE = "control_mode"
 
-# Plan 2.8's table, in ControlMode enum order (core/types.h): the option's
+# The control surface's modes (docs/protocol.md), in ControlMode enum order
+# (types.h): the option's
 # index IS the wire value the rewrite hook applies, so no string lookup is
 # needed on the hot control path (AtlanticV5Select::control()).
 OPTION_PASSTHROUGH = "passthrough"
@@ -41,7 +42,7 @@ def _final_validate(config):
     hub_conf = fconf.get_config_for_path(hub_path)
     if hub_conf[CONF_MODE] != MODE_MITM:
         raise cv.Invalid(
-            "control_mode requires atlantic_v5 mode: mitm (plan 2.8: 'this only works in MITM mode')",
+            "control_mode requires atlantic_v5 mode: mitm (rewriting frames only works in MITM mode)",
             path=[CONF_CONTROL_MODE],
         )
 

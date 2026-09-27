@@ -1,4 +1,4 @@
-// L3 ESPHome glue. The raw_frame_dump switch (plan 3.8): writes into the hub's
+// L3 ESPHome glue. The raw_frame_dump switch: writes into the hub's
 // raw_frame_dump_ flag, so it earns its own dedicated class (ADR 0001), unlike
 // the read-only sensor/binary_sensor/text_sensor platforms.
 #pragma once

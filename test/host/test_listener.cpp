@@ -1,4 +1,4 @@
-// M4 host test (ticket 07): Listener (listener.{h,cpp}) - single-bus
+// Host test: Listener (listener.{h,cpp}) - single-bus
 // assembly + decode + the MAIN-quiet staleness gate, independent of ESPHome.
 #include <cstdint>
 #include <utility>
@@ -68,8 +68,8 @@ int main() {
   }
 
   // --- An HMI-origin write frame (hmi_version, header 0165 0003 01, txn 0x65)
-  // decodes but must never reset the MAIN-quiet gate (ticket 07: "HMI going
-  // quiet alone does not" - the mirror image, HMI staying chatty alone, must
+  // decodes but must never reset the MAIN-quiet gate (HMI going
+  // quiet alone does not reset it - the mirror image, HMI staying chatty alone, must
   // likewise never mask MAIN going quiet). ---
   {
     Listener l;
@@ -89,7 +89,8 @@ int main() {
   }
 
   // --- A frame with a corrupted CRC is fail-safe discarded: no decode, no
-  // staleness reset (plan 2.5.2 #4 / "never decode a frame whose CRC failed"). ---
+  // staleness reset (single-bus framing resyncs, and a frame whose CRC failed is
+  // never decoded). ---
   {
     Listener l;
     Collector c;
@@ -119,7 +120,7 @@ int main() {
     CHECK(l.assembler_stats().silence_closes == 1);
   }
 
-  // --- set_frame_sink (plan 3.8's raw_frame_dump): fired once per complete,
+  // --- set_frame_sink (behind raw_frame_dump): fired once per complete,
   // CRC-valid frame with the frame itself, independent of whether the header
   // is in Decoder's catalogue - never fired for a bad-CRC frame. ---
   {
@@ -152,8 +153,8 @@ int main() {
   }
 
   // --- has_main() distinguishes "never heard from MAIN" from "heard from MAIN
-  // at t=0" (ticket 16: the `connected` entity must read off until a frame has
-  // actually been seen, which us_since_main() alone cannot express). ---
+  // at t=0": the `connected` entity must read off until a frame has
+  // actually been seen, which us_since_main() alone cannot express. ---
   {
     Listener l;
     CHECK(!l.has_main());
@@ -184,7 +185,7 @@ int main() {
     CHECK(l.us_since_main(0) == 0);
   }
 
-  // --- set_silence_us (ticket 17's frame_silence knob) actually reaches the
+  // --- set_silence_us (the frame_silence knob) actually reaches the
   // assembler: the same partial frame and the same tick() instant close under
   // a shortened backstop and stay open under the default one. ---
   {

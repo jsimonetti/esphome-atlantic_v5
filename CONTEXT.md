@@ -51,7 +51,7 @@ _Avoid_: writable entity
 An entity that only ever receives `publish_state()` from the hub and never writes back into runtime state (sensor, binary_sensor, text_sensor).
 
 **RelayPolicy** / **Rewrite**:
-The only code path allowed to alter bus bytes in flight; applies solely to the input-status frame (header `0x0164FF1403`), per the control surface described in the implementation plan.
+The only code path allowed to alter bus bytes in flight; applies solely to the input-status frame (header `0x0164FF1403`), per the control surface described in [`docs/protocol.md`](docs/protocol.md).
 
 **Observed input**:
 The state of the appliance's physical I1/I2 contacts, as MAIN reports it on the bus. What the input entities publish in every mode: a Rewrite never changes what they report.

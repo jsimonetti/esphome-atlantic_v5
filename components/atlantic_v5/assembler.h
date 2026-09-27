@@ -5,19 +5,20 @@
 
 namespace atlantic_v5 {
 
-// Byte-at-a-time frame assembly per plan 2.5. Two modes selected at construction:
-// dual_bus=true disambiguates payload-less frames by channel/direction (2.5.1) and
+// Byte-at-a-time frame assembly per docs/protocol.md "Framing rules". Two modes
+// selected at construction:
+// dual_bus=true disambiguates payload-less frames by channel/direction ("Dual-bus") and
 // always delivers whatever it buffers once length rules close it, even on CRC
 // failure (fail-safe passthrough; the caller forwards raw bytes regardless).
-// dual_bus=false is the single-wire listener path (2.5.2): it speculatively
+// dual_bus=false is the single-wire listener path ("Single-bus"): it speculatively
 // CRC-checks at 7 bytes and drops+resyncs the whole buffer on any CRC failure,
 // since there is no channel/direction information to fall back on.
 class FrameAssembler {
  public:
-  static constexpr uint32_t DEFAULT_SILENCE_US = 4000;  // plan 2.1/2.5.1 backstop threshold
+  static constexpr uint32_t DEFAULT_SILENCE_US = 4000;  // framing backstop threshold
 
-  // silence_us is injectable (plan 3.2: "passed in at construction so tests can vary
-  // it"); the transport layer wires in its own configured value, tests can shrink it.
+  // silence_us is injectable so tests can vary it; the transport layer wires in its
+  // own configured value.
   explicit FrameAssembler(Channel ch, bool dual_bus, uint32_t silence_us = DEFAULT_SILENCE_US);
 
   // Returns true when frame()/frame_len() hold a complete candidate frame.
