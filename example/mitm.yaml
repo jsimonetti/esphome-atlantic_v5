@@ -37,15 +37,87 @@ sensor:
   - platform: atlantic_v5
     water_temperature:
       name: DHW water temperature
+    compressor_outlet_temperature:
+      name: DHW compressor outlet temperature
+    air_inlet_temperature:
+      name: DHW air inlet temperature
+    evaporator_1_temperature:
+      name: DHW evaporator 1 temperature
+    evaporator_2_temperature:
+      name: DHW evaporator 2 temperature
+    evaporator_3_temperature:
+      name: DHW evaporator 3 temperature
     setpoint:
       name: DHW setpoint
+    water_temperature_min:
+      name: DHW water temperature min
+    water_temperature_max:
+      name: DHW water temperature max
+    compressor_outlet_temperature_min:
+      name: DHW compressor outlet temperature min
+    compressor_outlet_temperature_max:
+      name: DHW compressor outlet temperature max
+    air_inlet_temperature_min:
+      name: DHW air inlet temperature min
+    air_inlet_temperature_max:
+      name: DHW air inlet temperature max
+    evaporator_1_temperature_min:
+      name: DHW evaporator 1 temperature min
+    evaporator_1_temperature_max:
+      name: DHW evaporator 1 temperature max
+    evaporator_2_temperature_min:
+      name: DHW evaporator 2 temperature min
+    evaporator_2_temperature_max:
+      name: DHW evaporator 2 temperature max
+    evaporator_3_temperature_min:
+      name: DHW evaporator 3 temperature min
+    evaporator_3_temperature_max:
+      name: DHW evaporator 3 temperature max
+    cycle_1_count:
+      name: DHW cycle 1 count
+    cycle_2_count:
+      name: DHW cycle 2 count
+    cycle_3_count:
+      name: DHW cycle 3 count
+    cycle_4_count:
+      name: DHW cycle 4 count
+    cycle_5_count:
+      name: DHW cycle 5 count
+    cycle_6_count:
+      name: DHW cycle 6 count
 
 binary_sensor:
   - platform: atlantic_v5
     heating_active:
       name: DHW heating
+    input_i1:
+      name: DHW input I1
+    input_i2:
+      name: DHW input I2
+    cycle_1_active:
+      name: DHW cycle 1 active
+    cycle_2_active:
+      name: DHW cycle 2 active
+    cycle_3_active:
+      name: DHW cycle 3 active
+    cycle_4_active:
+      name: DHW cycle 4 active
+    cycle_5_active:
+      name: DHW cycle 5 active
+    cycle_6_active:
+      name: DHW cycle 6 active
 
 text_sensor:
   - platform: atlantic_v5
+    firmware_version:
+      name: DHW firmware version
     serial_number:
       name: DHW serial number
+    power_board_version:
+      name: DHW power board version
+    controller_model:
+      name: DHW controller model
+    hmi_version:
+      name: DHW HMI version
+    hmi_model:
+      name: DHW HMI model
