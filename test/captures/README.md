@@ -13,3 +13,12 @@ capture exists. **They must never be used to produce or freeze
 values reviewed by a human against real hardware, which synthetic data
 cannot satisfy. Real captures (once available) should not carry the
 `synthetic_` prefix.
+
+`external_*.csv` are transcribed from third-party reports (e.g. GitHub issue
+comments from other AquaMQTT users/contributors) rather than captured by this
+project on its own hardware. Each file's leading `#` comment lines record the
+exact source (URL, author, date) and note whether any bytes (e.g. CRC
+trailers) were computed by us rather than taken verbatim from the source.
+Like `synthetic_*.csv`, they must never be used to freeze `*.expected.json`
+golden files — only a human review against our own real hardware capture
+satisfies M3.
