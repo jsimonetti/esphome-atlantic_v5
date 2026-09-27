@@ -38,8 +38,11 @@ class Relay {
   // has already been forwarded to the opposite side ("forward first, enqueue
   // second", plan 3.9 #1) — a sink that drops the event can never affect
   // forwarding, which has already happened by the time this runs. f reflects any
-  // rewrite RelayPolicy::apply already applied.
-  using FrameSink = void (*)(void *ctx, Channel channel, const Frame &f, uint32_t t_us);
+  // rewrite RelayPolicy::apply already applied, i.e. the bytes that went out on
+  // the wire. observed_payload is the payload as received, non-null only when a
+  // rewrite was applied; decode that rather than f's payload (ADR 0002).
+  using FrameSink = void (*)(void *ctx, Channel channel, const Frame &f, const uint8_t *observed_payload,
+                             uint32_t t_us);
   void set_frame_sink(FrameSink sink, void *ctx) {
     frame_sink_ = sink;
     frame_ctx_ = ctx;

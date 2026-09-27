@@ -14,7 +14,7 @@ namespace atlantic_v5 {
 class RelayPolicy {
  public:
   static constexpr uint64_t INPUT_STATUS_HEADER_KEY = 0x0164FF1403ULL;
-  static constexpr uint8_t INPUT_STATUS_PAYLOAD_LEN = 3;
+  static constexpr uint8_t INPUT_STATUS_PAYLOAD_LEN = REWRITE_PAYLOAD_LEN;
 
   void set_control_mode(ControlMode m) { mode_.store(static_cast<uint8_t>(m), std::memory_order_relaxed); }
   ControlMode control_mode() const {

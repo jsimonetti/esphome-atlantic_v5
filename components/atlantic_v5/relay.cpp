@@ -1,5 +1,7 @@
 #include "relay.h"
 
+#include <cstring>
+
 #include "frame.h"
 
 namespace atlantic_v5 {
@@ -39,6 +41,12 @@ void Relay::service(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
 
 void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   Frame f(in_channel, in.asm_.frame(), in.asm_.frame_len());
+  // Snapshot the payload before the rewrite: the wire gets the rewritten frame,
+  // the decoder gets what the appliance actually reported (ADR 0002).
+  uint8_t observed[REWRITE_PAYLOAD_LEN];
+  if (f.payload_len() == REWRITE_PAYLOAD_LEN)
+    std::memcpy(observed, f.payload(), REWRITE_PAYLOAD_LEN);
+
   // apply() is itself a no-op on a bad-CRC or non-matching frame, which gives us
   // the fail-safe forwarding rule (plan 2.5.1 / 3.9 #2) for free: forward first,
   // exactly as received unless the rewrite hook says otherwise.
@@ -52,7 +60,7 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
     stats_.rewrites_applied++;
 
   if (frame_sink_ != nullptr)
-    frame_sink_(frame_ctx_, in_channel, f, now_us);
+    frame_sink_(frame_ctx_, in_channel, f, rewritten ? observed : nullptr, now_us);
 
   // Latency here is last-byte-in (now_us, the timestamp the completed frame was
   // detected at) to write-initiated (plan 3.6.2, excluding fixed transmit time).

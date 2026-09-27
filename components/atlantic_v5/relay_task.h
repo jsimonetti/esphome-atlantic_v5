@@ -61,8 +61,9 @@ class RelayTask {
  private:
   static void task_entry(void *arg);
   void run();
-  static void frame_sink_trampoline(void *ctx, Channel channel, const Frame &f, uint32_t t_us);
-  void push_event(Channel channel, const Frame &f, uint32_t t_us);
+  static void frame_sink_trampoline(void *ctx, Channel channel, const Frame &f, const uint8_t *observed_payload,
+                                    uint32_t t_us);
+  void push_event(Channel channel, const Frame &f, const uint8_t *observed_payload, uint32_t t_us);
   void run_self_test();
 
   UartBusIo hmi_io_;

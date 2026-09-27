@@ -10,6 +10,11 @@ static constexpr size_t MAX_FRAME = 32;  // 29 bytes observed on the wire, round
 static constexpr size_t HEADER_LEN = 5;
 static constexpr uint32_t BAUD = 38400;
 
+// Payload length of the only rewritable frame (docs/protocol.md, control surface).
+// Lives here rather than on RelayPolicy because FrameEvent carries a copy of that
+// payload and must not depend on the policy layer.
+static constexpr size_t REWRITE_PAYLOAD_LEN = 3;
+
 // Which party a byte stream or Frame came from. BUS is only meaningful for a
 // single-wire listener capture, where direction isn't separable at the wire.
 enum class Channel : uint8_t { HMI = 0, MAIN = 1, BUS = 2 };
@@ -29,6 +34,10 @@ struct FrameEvent {
   bool modified;
   bool crc_ok;
   uint32_t t_us;  // arrival of the last byte
+  // Payload as received, before the rewrite. Meaningful only when modified;
+  // decoding this rather than data is what makes the input entities report the
+  // observed input (ADR 0002).
+  uint8_t observed_payload[REWRITE_PAYLOAD_LEN];
 };
 
 enum class ControlMode : uint8_t {

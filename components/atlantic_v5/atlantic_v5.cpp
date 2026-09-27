@@ -176,7 +176,13 @@ void AtlanticV5Component::loop_mitm() {
     // resets the staleness gate, matching ticket 07's listener-mode semantics.
     if (ev.channel == ::atlantic_v5::Channel::MAIN && f.has_payload())
       this->last_main_us_ = ev.t_us;
+    // Dump before restoring: raw_frame_dump exists to show what went out on the
+    // wire, which is the rewritten frame.
     this->maybe_dump_frame(f, ev.t_us);
+    // ADR 0002: the input entities report the observed input, so put the
+    // pre-rewrite payload back before decoding.
+    if (ev.modified)
+      f.replace_payload(ev.observed_payload);
     this->decoder_.decode(f, &AtlanticV5Component::publish_trampoline, this);
   }
   uint32_t now_us32 = static_cast<uint32_t>(esp_timer_get_time());

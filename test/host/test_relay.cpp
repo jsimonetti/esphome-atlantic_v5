@@ -10,7 +10,9 @@
 #include <vector>
 
 #include "bus_io.h"
+#include "catalog.h"
 #include "crc16.h"
+#include "decoder.h"
 #include "frame.h"
 #include "relay.h"
 #include "relay_policy.h"
@@ -396,6 +398,8 @@ int main() {
       Channel channel;
       std::vector<uint8_t> bytes;
       size_t writes_so_far;
+      bool had_observed;
+      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN];
     };
     std::vector<Event> events;
     struct Ctx {
@@ -404,10 +408,13 @@ int main() {
       MockBusIo *main_io;
     } ctx{&events, &hmi_io, &main_io};
     relay.set_frame_sink(
-        [](void *raw_ctx, Channel channel, const Frame &f, uint32_t /*t_us*/) {
+        [](void *raw_ctx, Channel channel, const Frame &f, const uint8_t *observed, uint32_t /*t_us*/) {
           auto *c = static_cast<Ctx *>(raw_ctx);
           size_t writes = c->hmi_io->writes_.size() + c->main_io->writes_.size();
-          c->events->push_back({channel, std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()), writes});
+          Event ev{channel, std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()), writes, observed != nullptr, {}};
+          if (observed != nullptr)
+            std::memcpy(ev.observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+          c->events->push_back(ev);
         },
         &ctx);
 
@@ -433,10 +440,126 @@ int main() {
       if (rows[i].bytes.size() > 7 && rows[i].bytes[0] == 0x01 && rows[i].bytes[1] == 0x64 &&
           rows[i].bytes[2] == 0xFF && rows[i].bytes[3] == 0x14 && rows[i].bytes[4] == 0x03) {
         CHECK(events[i].bytes != rows[i].bytes);
+        // ADR 0002: the same event also carries the payload as received, so the
+        // input entities can report the observed input rather than our own
+        // injected {1, 1}. Bytes 6..8 of the raw row are that payload.
+        CHECK(events[i].had_observed);
+        CHECK(events[i].observed[0] == rows[i].bytes[6]);
+        CHECK(events[i].observed[1] == rows[i].bytes[7]);
+        CHECK(events[i].observed[2] == rows[i].bytes[8]);
+        // Byte 2 is a status report, never a command: it survives the rewrite.
+        CHECK(events[i].bytes[8] == rows[i].bytes[8]);
         found_rewritten_event = true;
+      } else {
+        // Nothing else is rewritten, so nothing else carries an observed payload.
+        CHECK(!events[i].had_observed);
       }
     }
     CHECK(found_rewritten_event);
+  }
+
+  // --- ADR 0002: with a rewrite active, the wire gets the rewritten payload but
+  // the decoder gets the observed one. Mirrors loop_mitm()'s exact sequence:
+  // dump the forwarded frame, restore the observed payload, then decode. ---
+  {
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;
+    policy.set_control_mode(atlantic_v5::ControlMode::BOOST);
+    Relay relay(hmi_io, main_io, policy);
+
+    struct Sunk {
+      std::vector<uint8_t> forwarded;
+      bool had_observed = false;
+      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN]{};
+    } sunk;
+    relay.set_frame_sink(
+        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint32_t) {
+          auto *s = static_cast<Sunk *>(ctx);
+          s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
+          s->had_observed = observed != nullptr;
+          if (observed != nullptr)
+            std::memcpy(s->observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+        },
+        &sunk);
+
+    // MAIN's input-status response: both contacts open, compressor running.
+    std::vector<uint8_t> frame{0x01, 0x64, 0xFF, 0x14, 0x03, 0x03, 0x00, 0x00, 0x01, 0x00, 0x00};
+    append_crc(frame);
+    main_io.queue(1000, frame);
+    main_io.set_now(1000);
+    hmi_io.set_now(1000);
+    relay.poll(1000);
+
+    // The wire sees BOOST: both inputs asserted, heating status copied through.
+    CHECK(sunk.forwarded.size() == frame.size());
+    CHECK(sunk.forwarded[6] == 0x01);
+    CHECK(sunk.forwarded[7] == 0x01);
+    CHECK(sunk.forwarded[8] == 0x01);
+    CHECK(sunk.had_observed);
+
+    Frame f(Channel::MAIN, sunk.forwarded.data(), static_cast<uint8_t>(sunk.forwarded.size()));
+    f.replace_payload(sunk.observed);
+    CHECK(f.crc_valid());
+
+    struct Seen {
+      bool i2 = true, i1 = true, heating = false;
+      bool got[3]{};
+    } seen;
+    atlantic_v5::Decoder decoder;
+    decoder.decode(
+        f,
+        [](void *ctx, const atlantic_v5::DecodedValue &v) {
+          auto *s = static_cast<Seen *>(ctx);
+          if (v.id == atlantic_v5::ENT_INPUT_I2) {
+            s->i2 = v.b;
+            s->got[0] = true;
+          } else if (v.id == atlantic_v5::ENT_INPUT_I1) {
+            s->i1 = v.b;
+            s->got[1] = true;
+          } else if (v.id == atlantic_v5::ENT_HEATING_ACTIVE) {
+            s->heating = v.b;
+            s->got[2] = true;
+          }
+        },
+        &seen);
+
+    CHECK(seen.got[0] && seen.got[1] && seen.got[2]);
+    // The appliance's real contacts, not the {1, 1} we injected.
+    CHECK(!seen.i2);
+    CHECK(!seen.i1);
+    CHECK(seen.heating);
+  }
+
+  // --- PASSTHROUGH leaves both paths identical: nothing rewritten, so no
+  // observed payload is carried and the forwarded frame is the received one. ---
+  {
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;  // defaults to PASSTHROUGH
+    Relay relay(hmi_io, main_io, policy);
+
+    struct Sunk {
+      std::vector<uint8_t> forwarded;
+      bool had_observed = false;
+    } sunk;
+    relay.set_frame_sink(
+        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint32_t) {
+          auto *s = static_cast<Sunk *>(ctx);
+          s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
+          s->had_observed = observed != nullptr;
+        },
+        &sunk);
+
+    std::vector<uint8_t> frame{0x01, 0x64, 0xFF, 0x14, 0x03, 0x03, 0x00, 0x01, 0x01, 0x00, 0x00};
+    append_crc(frame);
+    main_io.queue(1000, frame);
+    main_io.set_now(1000);
+    hmi_io.set_now(1000);
+    relay.poll(1000);
+
+    CHECK(sunk.forwarded == frame);
+    CHECK(!sunk.had_observed);
+    CHECK(main_io.writes_.empty());
+    CHECK(hmi_io.writes_.size() == 1);
   }
 
   TEST_MAIN_RETURN();
