@@ -85,3 +85,18 @@ target_include_directories(test_listener PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(test_listener PRIVATE
     CAPTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../captures")
 add_test(NAME test_listener COMMAND test_listener)
+
+# Plan 3.7.3: catalog.h's EntityId, catalog.cpp's entity_name() table and the
+# platform .py files' ENT_* constants are three hand-maintained lists that must
+# agree. The check is Python because two of the three sources are Python;
+# REQUIRED rather than optional so a missing interpreter fails at configure
+# time instead of silently dropping the only test that guards this.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME test_catalog_parity
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_catalog_parity.py)
+
+# esphome_log_to_capture.py is the only path from a hardware capture session to
+# a usable test/captures/*.csv, so it round-trips a committed capture through
+# the ESPHome log framing rather than through hand-written expectations.
+add_test(NAME test_log_to_capture
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_log_to_capture.py)

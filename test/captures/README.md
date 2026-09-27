@@ -32,3 +32,32 @@ satisfies M3.
 matching `external_*.csv`, kept for manual inspection only — not a golden
 file, not asserted by any test, gitignored like its source capture.
 
+## Recording your own capture
+
+Set `bus_capture: true` on the `atlantic_v5:` hub, flash a devkit tapped onto
+the bus in listener mode, and pipe the logs through the converter:
+
+```sh
+uv run esphome logs example/listener.yaml \
+  | python3 test/host/esphome_log_to_capture.py -o test/captures/my_capture.csv
+```
+
+The device logs `BUSCAP,<t_us>,<channel>,<hex>` under the
+`atlantic_v5.bus_capture` tag at `INFO` level; ESPHome always prepends its own
+timestamp/tag/level (and ANSI colour on a tty), which is what
+[`esphome_log_to_capture.py`](../host/esphome_log_to_capture.py) strips. It
+also rebases timestamps onto the first chunk, because the device clock is
+microseconds since boot and the replay parser holds `t_us` in a `uint32`,
+which wraps after ~71 minutes — so a single capture must stay shorter than
+that, whatever the uptime when you started. Pass `--no-rebase` to keep the raw
+numbers.
+
+Malformed lines are reported, not skipped: if the converter errors, the log
+is truncated or interleaved, not the bus.
+
+Check the result before trusting it:
+
+```sh
+./test/host/build/replay --capture test/captures/my_capture.csv --mode listener --json
+```
+
