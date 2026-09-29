@@ -93,8 +93,8 @@ and the log carries a best-effort warning.
 The bus itself is 38400 baud, 8N1, half-duplex, single-wire — not a level
 your ESP32 GPIOs can safely share directly with the heat pump's electronics.
 Each side needs its own transceiver sitting between the ESP32 UART and the HMI
-or MAIN connector. How that transceiver's direction is controlled is the one
-piece of wiring variation this component handles in three ways:
+or MAIN connector. How that transceiver drives the wire is the one piece of
+wiring variation this component has to be told about.
 
 ### Boards
 
@@ -103,47 +103,115 @@ identical to the one [AquaMQTT](https://github.com/tspopp/AquaMQTT) solves for
 the older (V3/V4) Groupe Atlantic protocols, and its hardware works here
 unchanged — the V5 protocol differs, the wiring does not. See
 [AquaMQTT's `pcb/` directory](https://github.com/tspopp/AquaMQTT/tree/main/pcb)
-for the board designs (revision 2.0 is the SN74LVC2T45-based one, orderable
-pre-assembled from JLCPCB) and
+for the board designs and
 [its `WIRING.md`](https://github.com/tspopp/AquaMQTT/blob/main/WIRING.md) for
-how to get at the HMI–MAIN link inside the unit. That revision-2.0 board is
-what this component was developed against.
+how to get at the HMI–MAIN link inside the unit.
 
-Board-specific notes for this component:
+Both published revisions work. They need different settings, because they solve
+the level-shifting problem in different ways: revision 2.0 uses a pair of
+direction-controlled transceivers, revision 1.0 a level converter with
+open-collector transistor drivers. Pick the section below that matches your
+board. Revision 2.0 is what this component was developed against.
 
-- Pin mapping, taken from AquaMQTT's own `Configuration.h` (the
-  `ENV_DEVKIT_ESP32` branch, which spells the same nets as raw GPIO numbers —
-  what this component needs, since it drives the ESP-IDF UART driver directly
-  and no Arduino pin remap applies):
+The data pins are the same on both revisions; only revision 2.0 adds the two
+direction pins:
 
-  | Signal | MAIN | HMI |
-  | --- | --- | --- |
-  | RX | GPIO5 | GPIO7 |
-  | TX | GPIO6 | GPIO8 |
-  | TX-enable (DIR, revision 2.0) | GPIO9 | GPIO10 |
+| Signal | MAIN | HMI |
+| --- | --- | --- |
+| RX | GPIO5 | GPIO7 |
+| TX | GPIO6 | GPIO8 |
+| TX-enable (DIR, revision 2.0 only) | GPIO9 | GPIO10 |
 
-  The `#else` branch of that same file spells the identical nets as Arduino
-  Nano ESP32 logical pins (D2/D3, D4/D5, D6/D7), which remap to exactly the
-  GPIO numbers above. Reading those TX-enable numbers as logical pins and
-  remapping them a second time yields GPIO18/GPIO21 — a plausible-looking but
-  wrong mapping this project carried for a while.
-- On revision 2.0, `mode: mitm` **requires** `tx_pin`, `tx_enable_pin` and
-  `one_wire_mirror: true` on both sides. That board pairs each side's two
-  transceiver channels onto the one physical bus wire under a single shared
-  direction pin, so during transmit the RX pin has to carry the TX signal too
-  (otherwise the two channels drive the wire against each other), and during
-  receive the UART's TX output has to be disconnected from its pin entirely
-  (otherwise it fights the transceiver driving the same pin). Omitting
-  `one_wire_mirror` is not a milder configuration — it stops the far end
-  answering at all, which the heat pump reports as emergency-heater mode.
-- Revision 2.0's passthrough jumper must be **installed** for `mode: listener`
-  and **removed** for `mode: mitm`.
-- Not every board in circulation exposes DIR / TX-enable lines. Without them,
-  `mode: mitm` may not be able to drive the bus at all; `mode: listener`
-  still works. The [startup self-test](#startup-self-test) is there to tell
-  you which situation you're in.
+These are raw ESP32-S3 chip GPIO numbers, which is what this component needs —
+it drives the ESP-IDF UART driver directly, so no Arduino pin remap applies.
+AquaMQTT's own `Configuration.h` spells the same six nets twice: once as raw
+GPIO (its `ENV_DEVKIT_ESP32` branch, matching the table above) and once as
+Arduino Nano ESP32 logical pins (D2/D3, D4/D5, D6/D7). Reading the latter and
+remapping it a second time yields GPIO18/GPIO21 for the direction pins — a
+plausible-looking but wrong mapping this project carried for a while.
 
-### Case A — DIR / TX-enable pin present
+On both revisions the passthrough jumper must be **installed** for
+`mode: listener` and **removed** for `mode: mitm`.
+
+#### Revision 2.0 — transceivers with a direction pin
+
+```yaml
+  hmi:
+    uart_num: 1
+    rx_pin: GPIO7
+    tx_pin: GPIO8
+    tx_enable_pin: GPIO10
+    one_wire_mirror: true
+  main:
+    uart_num: 2
+    rx_pin: GPIO5
+    tx_pin: GPIO6
+    tx_enable_pin: GPIO9
+    one_wire_mirror: true
+```
+
+In `mode: mitm`, all three of `tx_pin`, `tx_enable_pin` and
+`one_wire_mirror: true` are **required on both sides**. This is Case A and
+Case C together, and neither is optional here:
+
+- Both of the transceiver's bus-side pins land on the one physical bus wire,
+  under a single shared direction pin. While transmitting, the RX pin must
+  carry the TX signal too, or the transceiver's two channels drive the wire
+  against each other. While receiving, the UART's TX output must be
+  disconnected from its pin, or it fights the transceiver driving that same
+  pin. That is what `one_wire_mirror` does.
+- The direction pin is held low by a pulldown on the board, so leaving
+  `tx_enable_pin` unset parks it in receive forever and nothing you write can
+  ever reach the bus.
+
+Getting any of this wrong doesn't degrade gracefully: the far end stops
+answering altogether, and the heat pump falls back to its electric heater.
+
+In `mode: listener`, declare one side with **only** `rx_pin`. Leave `tx_pin`
+unset: the direction pin is unconfigured and therefore held in receive, so the
+transceiver is driving the ESP32's TX pin, and assigning the UART's TX output
+to that same pin puts the two against each other.
+
+#### Revision 1.0 — level converter with open-collector drivers
+
+```yaml
+  hmi:
+    uart_num: 1
+    rx_pin: GPIO7
+    tx_pin: GPIO8
+  main:
+    uart_num: 2
+    rx_pin: GPIO5
+    tx_pin: GPIO6
+```
+
+No `tx_enable_pin` and no `one_wire_mirror` — this is plain Case B. The
+revision has no direction line anywhere, and does not need one: its transmit
+path is an open-collector transistor stage onto a pulled-up wire, so the board
+releases the bus whenever the UART's TX line idles high. Receive is a
+level-shifted tap on that same wire.
+
+Do **not** set `one_wire_mirror: true` here. The RX pin sits behind a
+bidirectional level-converter channel whose far side is on the bus, so driving
+it would pull the bus low a second time, in parallel with the transistor stage
+and with different edge timing.
+
+`mode: mitm` logs a warning when neither side sets `tx_enable_pin`. On this
+revision that warning is expected; the [startup self-test](#startup-self-test)
+is what tells you whether transmission is actually reaching the bus.
+
+In `mode: listener`, declare one side with only `rx_pin`.
+
+### Other boards
+
+If your hardware is neither of the above, the three behaviours below are
+selected independently per side, and can be combined. Not every board exposes
+a direction line; without one, `mode: mitm` may not be able to drive the bus
+at all, while `mode: listener` still works. The
+[startup self-test](#startup-self-test) is there to tell you which situation
+you are in.
+
+#### Case A — DIR / TX-enable pin present
 
 Set `tx_enable_pin` on that side. Both DIR pins are parked LOW (receive) at
 setup and never driven while idle. Before every transmit: DIR high, wait
@@ -151,21 +219,22 @@ setup and never driven while idle. Before every transmit: DIR high, wait
 the bytes out, wait `dir_hold` (default 0 µs), then DIR low again. Both are
 tunable — see "Bus timing" below.
 
-### Case B — no DIR pin
+#### Case B — no DIR pin
 
 Omit `tx_enable_pin` entirely. The component writes straight to the UART TX
 line with no direction handling at all. This only works if your transceiver
 can always drive the bus (or the bus is genuinely open-drain) — the startup
 self-test (below) tells you whether that's actually true on your board.
 
-### Case C — one-wire mirror
+#### Case C — one-wire mirror
 
 Some transceiver boards pair both of a side's channels onto the *same* physical
 bus wire, so during transmit the TX signal has to appear on both the TX and RX
 pins, and during receive neither pin may be driven by the UART. Set
 `one_wire_mirror: true` on that side to enable it; combine with `tx_enable_pin`
-if the board also has a DIR line to assert around the transmit window. The
-AquaMQTT revision-2.0 board needs both.
+if the board also has a DIR line to assert around the transmit window. Leave it
+off unless you know your board is wired this way — it drives the RX pin, which
+on other topologies means fighting whatever is already driving it.
 
 ## Bus timing
 
