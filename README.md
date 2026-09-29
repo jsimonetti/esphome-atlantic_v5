@@ -68,7 +68,7 @@ atlantic_v5:
     uart_num: 1
     rx_pin: GPIO7
     tx_pin: GPIO8
-    tx_enable_pin: GPIO10   # omit if your transceiver has no DIR pin
+    tx_enable_pin: GPIO10   # omit only if your transceiver has no DIR pin
     one_wire_mirror: true
   main:
     uart_num: 2
@@ -77,6 +77,9 @@ atlantic_v5:
     tx_enable_pin: GPIO9
     one_wire_mirror: true
 ```
+
+On the AquaMQTT revision-2.0 board, `tx_pin`, `tx_enable_pin` and
+`one_wire_mirror: true` are all required on **both** sides — see "Wiring".
 
 Both `hmi:` and `main:` are required, each needs a `tx_pin`, and the target
 needs two UART ports free besides the console (UART0) — **MITM is rejected at
@@ -124,9 +127,15 @@ Board-specific notes for this component:
   GPIO numbers above. Reading those TX-enable numbers as logical pins and
   remapping them a second time yields GPIO18/GPIO21 — a plausible-looking but
   wrong mapping this project carried for a while.
-- The AquaMQTT board routes each side's TX and RX onto one physical bus wire,
-  so set `one_wire_mirror: true` (Case C below) on both sides. On revision 2.0
-  this is needed *in addition to* `tx_enable_pin`, not instead of it.
+- On revision 2.0, `mode: mitm` **requires** `tx_pin`, `tx_enable_pin` and
+  `one_wire_mirror: true` on both sides. That board pairs each side's two
+  transceiver channels onto the one physical bus wire under a single shared
+  direction pin, so during transmit the RX pin has to carry the TX signal too
+  (otherwise the two channels drive the wire against each other), and during
+  receive the UART's TX output has to be disconnected from its pin entirely
+  (otherwise it fights the transceiver driving the same pin). Omitting
+  `one_wire_mirror` is not a milder configuration — it stops the far end
+  answering at all, which the heat pump reports as emergency-heater mode.
 - Revision 2.0's passthrough jumper must be **installed** for `mode: listener`
   and **removed** for `mode: mitm`.
 - Not every board in circulation exposes DIR / TX-enable lines. Without them,
@@ -139,8 +148,8 @@ Board-specific notes for this component:
 Set `tx_enable_pin` on that side. Both DIR pins are parked LOW (receive) at
 setup and never driven while idle. Before every transmit: DIR high, wait
 `dir_setup` (default 10 µs), write, wait for the UART to finish shifting
-the bytes out, hold DIR high for `dir_hold` (default 260 µs, about one byte
-time), then DIR low again. Both are tunable — see "Bus timing" below.
+the bytes out, wait `dir_hold` (default 0 µs), then DIR low again. Both are
+tunable — see "Bus timing" below.
 
 ### Case B — no DIR pin
 
@@ -151,12 +160,12 @@ self-test (below) tells you whether that's actually true on your board.
 
 ### Case C — one-wire mirror
 
-Some transceiver boards route both the HMI-side and MAIN-side signal onto the
-*same* physical bus wire per side, so during transmit the TX signal has to
-appear on both the TX and RX pins, and during receive neither pin may be
-driven. Set `one_wire_mirror: true` on that side to enable it; combine with
-`tx_enable_pin` if the board also has a DIR line to assert around the
-transmit window.
+Some transceiver boards pair both of a side's channels onto the *same* physical
+bus wire, so during transmit the TX signal has to appear on both the TX and RX
+pins, and during receive neither pin may be driven by the UART. Set
+`one_wire_mirror: true` on that side to enable it; combine with `tx_enable_pin`
+if the board also has a DIR line to assert around the transmit window. The
+AquaMQTT revision-2.0 board needs both.
 
 ## Bus timing
 
@@ -170,7 +179,7 @@ unset unless something is actually wrong.
 | `frame_silence` | `atlantic_v5:` | `4000us` | Idle time after which a partially received frame is closed and handed on. Raise it if long frames are being cut in half; lower it only if you know the bus is faster than this component assumes. Must be non-zero. |
 | `echo_drain` | `atlantic_v5:` | `200us` | `mitm` only. Bytes arriving on a side within this window of a write *to* that side are treated as the transceiver's own echo and discarded. Too low and your own transmissions get relayed back; too high and a fast reply from the other end is swallowed. |
 | `dir_setup` | `hmi:` / `main:` | `10us` | `mitm`, Case A only. Delay between asserting DIR and starting to write. |
-| `dir_hold` | `hmi:` / `main:` | `260us` | `mitm`, Case A only. How long DIR stays asserted after the last byte has shifted out. |
+| `dir_hold` | `hmi:` / `main:` | `0us` | `mitm`, Case A only. How long DIR stays asserted after the last byte has shifted out. Raise it only if the far end is missing the tail of your frames — every microsecond here is time the transceiver is still driving the bus, which can clip the start of the reply. |
 
 `dir_setup` and `dir_hold` are per side because the two sides can genuinely be
 wired with different transceivers. They are rejected in `mode: listener`,
@@ -188,7 +197,7 @@ atlantic_v5:
     tx_pin: GPIO8
     tx_enable_pin: GPIO10
     dir_setup: 10us
-    dir_hold: 260us
+    dir_hold: 0us
   main:
     # ...
 ```

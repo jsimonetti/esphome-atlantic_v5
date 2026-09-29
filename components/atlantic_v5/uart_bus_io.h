@@ -17,7 +17,10 @@
 namespace atlantic_v5 {
 
 inline constexpr uint32_t DEFAULT_DIR_SETUP_US = 10;
-inline constexpr uint32_t DEFAULT_DIR_HOLD_US = 260;  // ~1 byte time
+// 0 matches the one known-good V5 relay on this hardware: it drops DIR straight
+// after flush. Holding longer keeps the transceiver driving the shared wire and
+// can clip the start of the peer's reply.
+inline constexpr uint32_t DEFAULT_DIR_HOLD_US = 0;
 
 struct UartBusIoConfig {
   uart_port_t port = UART_NUM_1;

@@ -29,10 +29,11 @@ atlantic_v5:
     uart_num: 1
     rx_pin: GPIO7
     tx_pin: GPIO8
+    # tx_enable_pin + one_wire_mirror are both required on revision-2.0 hardware.
     tx_enable_pin: GPIO10
     one_wire_mirror: true
     # dir_setup: 10us
-    # dir_hold: 260us
+    # dir_hold: 0us
   main:
     uart_num: 2
     rx_pin: GPIO5
@@ -40,7 +41,7 @@ atlantic_v5:
     tx_enable_pin: GPIO9
     one_wire_mirror: true
     # dir_setup: 10us
-    # dir_hold: 260us
+    # dir_hold: 0us
 
 sensor:
   - platform: atlantic_v5
