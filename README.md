@@ -111,7 +111,9 @@ Both published revisions work. They need different settings, because they solve
 the level-shifting problem in different ways: revision 2.0 uses a pair of
 direction-controlled transceivers, revision 1.0 a level converter with
 open-collector transistor drivers. Pick the section below that matches your
-board. Revision 2.0 is what this component was developed against.
+board. Revision 1.0 is the board this component has actually been run on; the
+revision-2.0 settings are derived from that board's netlist and from a
+known-good third-party V5 relay, and have not been exercised here.
 
 The data pins are the same on both revisions; only revision 2.0 adds the two
 direction pins:
@@ -239,10 +241,10 @@ on other topologies means fighting whatever is already driving it.
 
 ## Bus timing
 
-Framing and line turnaround are governed by four timings. The defaults are
-what this component was developed against; they are exposed so hardware this
-project has never seen can be tuned without rebuilding anything. Leave them
-unset unless something is actually wrong.
+Framing and line turnaround are governed by four timings. The defaults follow
+the one known-good V5 relay implementation for this bus; they are exposed so
+hardware this project has never seen can be tuned without rebuilding anything.
+Leave them unset unless something is actually wrong.
 
 | Key | Where | Default | What it does |
 | --- | --- | --- | --- |
@@ -460,7 +462,7 @@ answer is hard. If you have hardware and can help close one, please do:
 ## Hardware-only acceptance
 
 Everything else in this component is verified against recorded bus captures
-and the host test suite. Three things genuinely cannot be proven without a
+and the host test suite. These things genuinely cannot be proven without a
 devkit wired to loopback GPIOs or a live bus, and remain open until someone
 runs them:
 
@@ -470,6 +472,9 @@ runs them:
   (excluding transmit time) budget holds on real hardware, not just in the
   host-side mock-clock model.
 - The startup self-test's echo detection against a real transceiver.
+- The whole revision-2.0 wiring section. Those requirements come from reading
+  that board's netlist and a known-good third-party relay; the only board this
+  component has run on is revision 1.0.
 
 ## Building and testing
 
