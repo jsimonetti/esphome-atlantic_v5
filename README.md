@@ -47,10 +47,10 @@ atlantic_v5:
     rx_pin: GPIO7
 ```
 
-No `tx_pin`/`tx_enable_pin` is used in this mode (the component never drives
-the bus in `listener`), and a `select: control_mode` entity is rejected at
-compile time (see "Control (MITM only)" below) — there's nothing to rewrite
-without a second UART sitting in the middle.
+`tx_pin` is rejected in this mode and `tx_enable_pin` is unused — the component
+never drives the bus in `listener`. A `select: control_mode` entity is rejected
+at compile time too (see "Control (MITM only)" below); there's nothing to
+rewrite without a second UART sitting in the middle.
 
 ### `mitm` — relay + optional rewrite
 
@@ -167,10 +167,11 @@ Case C together, and neither is optional here:
 Getting any of this wrong doesn't degrade gracefully: the far end stops
 answering altogether, and the heat pump falls back to its electric heater.
 
-In `mode: listener`, declare one side with **only** `rx_pin`. Leave `tx_pin`
-unset: the direction pin is unconfigured and therefore held in receive, so the
-transceiver is driving the ESP32's TX pin, and assigning the UART's TX output
-to that same pin puts the two against each other.
+In `mode: listener`, declare one side with **only** `rx_pin`. `tx_pin` is
+rejected there, and on this board that rejection is doing real work: with the
+direction pin unconfigured it is held in receive, so the transceiver is driving
+the ESP32's TX pin, and handing that same pin to the UART's output would put
+the two against each other.
 
 #### Revision 1.0 — level converter with open-collector drivers
 

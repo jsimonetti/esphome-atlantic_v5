@@ -80,9 +80,8 @@ void AtlanticV5Component::setup_listener() {
   cfg.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
   cfg.source_clk = UART_SCLK_DEFAULT;
   uart_param_config(this->port_, &cfg);
-  // TX pin is UART_PIN_NO_CHANGE: listener mode never drives the bus (G2).
-  int tx_pin = this->tx_pin_ >= 0 ? this->tx_pin_ : UART_PIN_NO_CHANGE;
-  uart_set_pin(this->port_, tx_pin, this->rx_pin_, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+  // TX stays unassigned (G2): a transceiver parked in receive drives that pin.
+  uart_set_pin(this->port_, UART_PIN_NO_CHANGE, this->rx_pin_, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
   uart_driver_install(this->port_, 512, 0, 0, nullptr, 0);
   uart_set_rx_full_threshold(this->port_, 1);
   uart_set_rx_timeout(this->port_, 2);

@@ -45,7 +45,6 @@ class AtlanticV5Component : public Component {
   void set_bus_capture(bool enabled) { bus_capture_ = enabled; }
   void set_uart_num(int uart_num) { uart_num_ = uart_num; }
   void set_rx_pin(int rx_pin) { rx_pin_ = rx_pin; }
-  void set_tx_pin(int tx_pin) { tx_pin_ = tx_pin; }
   // timeout_ms is stored in microseconds so it compares directly against
   // Listener::us_since_main() without a conversion on every loop() tick.
   void set_timeout(uint32_t timeout_ms) { timeout_us_ = timeout_ms * 1000ULL; }
@@ -156,7 +155,6 @@ class AtlanticV5Component : public Component {
   bool raw_frame_dump_{false};
   int uart_num_{1};
   int rx_pin_{-1};
-  int tx_pin_{-1};
   uint32_t timeout_us_{60'000'000};  // default 60s
   uint32_t frame_silence_us_{::atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US};
   uint32_t echo_drain_us_{::atlantic_v5::DEFAULT_ECHO_DRAIN_US};

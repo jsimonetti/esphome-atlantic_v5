@@ -124,10 +124,18 @@ def _validate_sides(config):
 
     if has_hmi == has_main:  # neither, or both
         raise cv.Invalid("mode: listener requires exactly one of 'hmi:' or 'main:'")
+    side_key = CONF_HMI if has_hmi else CONF_MAIN
+    # Not merely inert: on a board whose transceiver is parked in receive, that
+    # transceiver already drives the TX pin, so handing the pin to the UART as
+    # well puts two outputs on one net.
+    if CONF_TX_PIN in config[side_key]:
+        raise cv.Invalid(
+            "'tx_pin' is not allowed in mode: listener, which never drives the bus",
+            path=[side_key, CONF_TX_PIN],
+        )
     # The DIR knobs only ever reach UartBusIo, which mode: listener never
     # builds - accepting them here would be accepting a setting that does
     # nothing.
-    side_key = CONF_HMI if has_hmi else CONF_MAIN
     for key in (CONF_DIR_SETUP, CONF_DIR_HOLD):
         if key in config[side_key]:
             raise cv.Invalid(f"'{key}' only applies in mode: mitm", path=[side_key, key])
@@ -211,5 +219,3 @@ async def to_code(config):
     side = config.get(CONF_HMI, config.get(CONF_MAIN))
     cg.add(var.set_uart_num(side[CONF_UART_NUM]))
     cg.add(var.set_rx_pin(side[CONF_RX_PIN]))
-    if CONF_TX_PIN in side:
-        cg.add(var.set_tx_pin(side[CONF_TX_PIN]))
