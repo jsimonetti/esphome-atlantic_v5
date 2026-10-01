@@ -375,7 +375,8 @@ int main() {
 
   // --- Raw capture piggyback: the capture sink sees
   // every chunk read from either side, tagged with the correct channel, including
-  // the echoed chunk that echo accounting discards from framing. ---
+  // the echoed chunk that echo accounting discards from framing, and is also
+  // called with len == 0 so a sink-side silence backstop can fire. ---
   {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
 
@@ -402,10 +403,21 @@ int main() {
       relay.poll(row.t_us);
     }
 
-    CHECK(captured.size() == rows.size());
+    // Both sides are serviced on every poll, so the idle side reports an empty chunk.
+    CHECK(captured.size() == rows.size() * 2);
+    size_t empties = 0;
+    std::vector<Captured> non_empty;
+    for (const auto &c : captured) {
+      if (c.bytes.empty())
+        empties++;
+      else
+        non_empty.push_back(c);
+    }
+    CHECK(empties == rows.size());
+    CHECK(non_empty.size() == rows.size());
     for (size_t i = 0; i < rows.size(); i++) {
-      CHECK(captured[i].channel == rows[i].channel);
-      CHECK(captured[i].bytes == rows[i].bytes);
+      CHECK(non_empty[i].channel == rows[i].channel);
+      CHECK(non_empty[i].bytes == rows[i].bytes);
     }
   }
 

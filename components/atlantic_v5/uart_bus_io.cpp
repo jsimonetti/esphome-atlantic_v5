@@ -34,7 +34,7 @@ void UartBusIo::install() {
     this->rx_sig_ = uart_periph_signal[this->cfg_.port].pins[SOC_UART_RX_PIN_IDX].signal;
   }
 
-  this->set_line_mode(LineMode::RX);  // park at setup time too, never driven while idle
+  this->set_line_mode(LineMode::RX);  // park at setup time too, before any traffic
 }
 
 int UartBusIo::read(uint8_t *dst, size_t max, uint32_t timeout_us) {
@@ -82,10 +82,12 @@ void UartBusIo::set_line_mode(LineMode mode) {
     esp_rom_gpio_connect_out_signal(rx_pin, this->tx_sig_, false, false);
     esp_rom_delay_us(10);
   } else {
-    // Park both pins as plain inputs and reattach the UART's own RX signal so
-    // neither pin is driven while idle.
-    esp_rom_gpio_connect_out_signal(tx_pin, SIG_GPIO_OUT_IDX, false, false);
-    gpio_set_direction(tx_pin, GPIO_MODE_INPUT);
+    // tx_pin is held at the idle mark level rather than released: a floating pin
+    // here corrupts reception on this transceiver, and both known-good
+    // configurations (mirror off, and AquaMQTT's V5 relay) drive it.
+    gpio_set_level(tx_pin, 1);
+    gpio_set_direction(tx_pin, GPIO_MODE_OUTPUT);
+    // rx_pin is parked as a plain input with the UART's own RX signal reattached.
     esp_rom_gpio_connect_out_signal(rx_pin, SIG_GPIO_OUT_IDX, false, false);
     gpio_set_direction(rx_pin, GPIO_MODE_INPUT);
     esp_rom_gpio_connect_in_signal(rx_pin, this->rx_sig_, false);

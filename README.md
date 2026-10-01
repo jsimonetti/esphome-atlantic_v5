@@ -110,9 +110,7 @@ Both published revisions work. They need different settings, because they solve
 the level-shifting problem in different ways: revision 2.0 uses a pair of
 direction-controlled transceivers, revision 1.0 a level converter with
 open-collector transistor drivers. Pick the section below that matches your
-board. Revision 1.0 is the board this component has actually been run on; the
-revision-2.0 settings are derived from that board's netlist and from a
-known-good third-party V5 relay, and have not been exercised here.
+board. Both revisions have been run in `mode: mitm` on real hardware.
 
 The data pins are the same on both revisions; only revision 2.0 adds the two
 direction pins:
@@ -158,9 +156,12 @@ Case C together, and neither is optional here:
 - Both of the transceiver's bus-side pins land on the one physical bus wire,
   under a single shared direction pin. While transmitting, the RX pin must
   carry the TX signal too, or the transceiver's two channels drive the wire
-  against each other. While receiving, the UART's TX output must be
-  disconnected from its pin, or it fights the transceiver driving that same
-  pin. That is what `one_wire_mirror` does.
+  against each other. While receiving, the UART's TX output is detached from
+  its pin and the pin is held at the idle mark level instead. That last part
+  is not optional and is the one thing the datasheet will not tell you:
+  *releasing* the TX pin rather than driving it lets the line float, and
+  reception degrades into near-random bytes (mostly `0x00`, the rest with a
+  single bit set). That is what `one_wire_mirror` does.
 - The direction pin is held low by a pulldown on the board, so leaving
   `tx_enable_pin` unset parks it in receive forever and nothing you write can
   ever reach the bus.
@@ -169,10 +170,8 @@ Getting any of this wrong doesn't degrade gracefully: the far end stops
 answering altogether, and the heat pump falls back to its electric heater.
 
 In `mode: listener`, declare one side with **only** `rx_pin`. `tx_pin` is
-rejected there, and on this board that rejection is doing real work: with the
-direction pin unconfigured it is held in receive, so the transceiver is driving
-the ESP32's TX pin, and handing that same pin to the UART's output would put
-the two against each other.
+rejected there: listener never drives the bus, so the UART's TX output has no
+business being attached to a pin that the transceiver may be driving.
 
 #### Revision 1.0 — level converter with open-collector drivers
 
@@ -515,10 +514,9 @@ runs them:
   of the other and vice versa), injecting real capture traffic on one side.
 - Measured last-byte-in to first-byte-out latency, to confirm the < 1 ms
   (excluding transmit time) budget holds on real hardware, not just in the
-  host-side mock-clock model.
-- The whole revision-2.0 wiring section. Those requirements come from reading
-  that board's netlist and a known-good third-party relay; the only board this
-  component has run on is revision 1.0.
+  host-side mock-clock model. `relay_latency_avg_us` currently reports
+  last-byte-in to write-*complete*, so it includes the frame's own transmit
+  time (~6.8 ms for a 25-byte frame) and does not answer this on its own.
 
 ## Building and testing
 

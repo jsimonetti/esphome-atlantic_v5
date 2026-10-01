@@ -20,9 +20,15 @@ void Relay::poll(uint32_t now_us) {
 void Relay::service(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   uint8_t buf[MAX_FRAME];
   int n = in.io.read(buf, sizeof(buf), 0);
+  if (n < 0)
+    n = 0;
+
+  // Called on every poll, including empty ones: the sink's own silence backstop
+  // can only fire when it is told that no bytes arrived.
+  if (capture_sink_ != nullptr)
+    capture_sink_(capture_ctx_, in_channel, buf, static_cast<size_t>(n), now_us);
+
   if (n > 0) {
-    if (capture_sink_ != nullptr)
-      capture_sink_(capture_ctx_, in_channel, buf, static_cast<size_t>(n), now_us);
     if (now_us < in.echo_until_us) {
       // Our own echo of a write to this side (3.5.3): discard, never frame it.
       stats_.echo_bytes += static_cast<uint32_t>(n);
@@ -58,8 +64,12 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   // received.
   bool rewritten = policy_.apply(f);
   out.io.write(f.raw(), f.raw_len());
+  // Sampled after write(), which blocks until the last bit is out: anchoring the
+  // echo window on now_us (the last byte *in*) expires it a whole frame-time
+  // before the first echoed byte can arrive.
+  uint32_t written_us = out.io.now_us();
   out.io.flush_input();
-  out.echo_until_us = now_us + cfg_.echo_drain_us;
+  out.echo_until_us = written_us + cfg_.echo_drain_us;
 
   stats_.frames_relayed++;
   if (rewritten)
@@ -69,15 +79,11 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
     frame_sink_(frame_ctx_, in_channel, f, rewritten ? observed : nullptr, now_us);
 
   // Latency here is last-byte-in (now_us, the timestamp the completed frame was
-  // detected at) to write-initiated, excluding fixed transmit time.
-  // out.io.now_us() is read immediately after the write, so in the synchronous
-  // host model (poll() called once per row with a single timestamp for both
-  // sides, MockBusIo's clock never advancing mid-call) this is still exactly 0,
-  // preserving every existing host assertion — but on real hardware (RelayTask
-  // with a real clock) this reports the actual wakeup+framing+policy
-  // overhead the relay task spent before this write, rather than a
-  // permanently-stubbed 0.
-  uint32_t latency_us = out.io.now_us() - now_us;
+  // detected at) to write-complete, so on real hardware it includes the frame's
+  // own transmit time. In the synchronous host model (poll() called once per row
+  // with a single timestamp for both sides, MockBusIo's clock never advancing
+  // mid-call) it is still exactly 0, preserving every existing host assertion.
+  uint32_t latency_us = written_us - now_us;
   stats_.latency_total_us += latency_us;
   stats_.latency_samples++;
   if (latency_us > stats_.latency_max_us)
