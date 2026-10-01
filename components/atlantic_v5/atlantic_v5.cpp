@@ -222,19 +222,22 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     return;
   this->last_diag_us_ = now_us;
 
-  uint32_t frames_ok = 0, crc_errors = 0, resyncs = 0, dropped_bytes = 0;
   uint32_t frames_relayed = 0, rewrites_applied = 0, echo_bytes = 0, queue_overflows = 0;
   uint32_t latency_max_us = 0, task_stack_free = 0;
   float latency_avg_us = 0;
   const ::atlantic_v5::Decoder::Stats *dec_stats;
 
   if (this->mode_ == Mode::MITM) {
+    // Published per side and never summed: a sum cannot distinguish "both sides
+    // healthy" from "one side dead, the other noisy".
     const auto &hmi = this->relay_task_->hmi_stats();
     const auto &main = this->relay_task_->main_stats();
-    frames_ok = hmi.frames + main.frames;
-    crc_errors = hmi.crc_errors + main.crc_errors;
-    resyncs = hmi.resyncs + main.resyncs;
-    dropped_bytes = hmi.dropped_bytes + main.dropped_bytes;
+    this->publish_diag_uint(::atlantic_v5::ENT_VALID_FRAMES_HMI, hmi.valid_frames);
+    this->publish_diag_uint(::atlantic_v5::ENT_CRC_ERRORS_HMI, hmi.crc_errors);
+    this->publish_diag_uint(::atlantic_v5::ENT_DROPPED_BYTES_HMI, hmi.dropped_bytes);
+    this->publish_diag_uint(::atlantic_v5::ENT_VALID_FRAMES_MAIN, main.valid_frames);
+    this->publish_diag_uint(::atlantic_v5::ENT_CRC_ERRORS_MAIN, main.crc_errors);
+    this->publish_diag_uint(::atlantic_v5::ENT_DROPPED_BYTES_MAIN, main.dropped_bytes);
     dec_stats = &this->decoder_.stats();
 
     const auto &relay_stats = this->relay_task_->stats();
@@ -247,18 +250,14 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     queue_overflows = this->relay_task_->queue_overflows();
     task_stack_free = this->relay_task_->stack_high_water_mark();
   } else {
+    // One wire, one assembler: the unsuffixed counters already describe a side.
     const auto &asm_stats = this->listener_.assembler_stats();
-    frames_ok = asm_stats.frames;
-    crc_errors = asm_stats.crc_errors;
-    resyncs = asm_stats.resyncs;
-    dropped_bytes = asm_stats.dropped_bytes;
+    this->publish_diag_uint(::atlantic_v5::ENT_VALID_FRAMES, asm_stats.valid_frames);
+    this->publish_diag_uint(::atlantic_v5::ENT_CRC_ERRORS, asm_stats.crc_errors);
+    this->publish_diag_uint(::atlantic_v5::ENT_DROPPED_BYTES, asm_stats.dropped_bytes);
     dec_stats = &this->listener_.decoder_stats();
   }
 
-  this->publish_diag_uint(::atlantic_v5::ENT_FRAMES_OK, frames_ok);
-  this->publish_diag_uint(::atlantic_v5::ENT_CRC_ERRORS, crc_errors);
-  this->publish_diag_uint(::atlantic_v5::ENT_RESYNCS, resyncs);
-  this->publish_diag_uint(::atlantic_v5::ENT_DROPPED_BYTES, dropped_bytes);
   this->publish_diag_uint(::atlantic_v5::ENT_UNKNOWN_FRAMES, dec_stats->unknown_headers);
   this->publish_diag_uint(::atlantic_v5::ENT_LENGTH_MISMATCHES, dec_stats->length_mismatches);
   this->publish_diag_uint(::atlantic_v5::ENT_TEXT_LENGTH_VARIANTS, dec_stats->text_length_variants);

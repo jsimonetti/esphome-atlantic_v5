@@ -8,6 +8,10 @@ Domain model for the ESPHome external component that decodes, and optionally rel
 One complete bus message, 7 to 29 bytes, terminated by a CRC-16/MODBUS checksum.
 _Avoid_: packet, message
 
+**Valid frame**:
+A Frame the assembler closed whose CRC checked out. A Frame can be closed and still be invalid (MITM forwards those anyway, fail-safe); only valid Frames are decoded, and a Side delivering zero of them is broken.
+_Avoid_: frame OK, good frame
+
 **Header key**:
 The first 5 bytes of a Frame as a big-endian `uint64_t`; the dispatch key used for decoding and for matching the rewrite target.
 

@@ -77,12 +77,12 @@ sensor:
       name: DHW cycle 5 count
     cycle_6_count:
       name: DHW cycle 6 count
-    frames_ok:
-      name: DHW frames ok
+    # Framing counters, listener-only spelling (one wire, one assembler).
+    # In mode: mitm these are rejected in favour of the _hmi/_main variants.
+    valid_frames:
+      name: DHW valid frames
     crc_errors:
       name: DHW CRC errors
-    resyncs:
-      name: DHW resyncs
     dropped_bytes:
       name: DHW dropped bytes
     unknown_frames:

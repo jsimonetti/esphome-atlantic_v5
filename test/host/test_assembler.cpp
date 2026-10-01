@@ -96,9 +96,28 @@ int main() {
     const auto &ms = main_asm.stats();
     CHECK(hs.crc_errors == 0 && ms.crc_errors == 0);
     CHECK(hs.dropped_bytes == 0 && ms.dropped_bytes == 0);
-    CHECK(hs.resyncs == 0 && ms.resyncs == 0);
     CHECK(hs.oversize == 0 && ms.oversize == 0);
     CHECK(hs.frames + ms.frames == rows.size());
+    CHECK(hs.valid_frames + ms.valid_frames == rows.size());
+  }
+
+  // --- Dual-bus, every frame CRC-bad: valid_frames must read zero even though
+  // the assembler still closes every one of them. This is the floating-input
+  // case from the bench board, where the old frames counter reported a healthy
+  // bus. ---
+  {
+    atlantic_v5::FrameAssembler main_asm(atlantic_v5::Channel::MAIN, /*dual_bus=*/true);
+    std::vector<std::vector<uint8_t>> delivered;
+    // Payload-less MAIN frame (byte[1] == 0x65) with a deliberately wrong CRC.
+    const Row bad{1000, atlantic_v5::Channel::MAIN, {0x01, 0x65, 0x00, 0x03, 0x01, 0xDE, 0xAD}};
+    for (int i = 0; i < 5; i++)
+      feed_row(main_asm, bad, delivered);
+
+    const auto &ms = main_asm.stats();
+    CHECK(delivered.size() == 5);
+    CHECK(ms.frames == 5);
+    CHECK(ms.crc_errors == 5);
+    CHECK(ms.valid_frames == 0);
   }
 
   // --- Single-bus, interleaved capture with a corrupted and a truncated frame:
@@ -125,9 +144,13 @@ int main() {
     // 21 rows, 2 deliberately broken (one bad CRC, one truncated) -> at least 19 clean.
     CHECK(delivered.size() >= 19);
     CHECK(stats.crc_errors >= 1);
-    CHECK(stats.resyncs >= 1);
     CHECK(stats.dropped_bytes > 0);
     CHECK(stats.speculative_accepts > 0);
+    // Single-bus drops a CRC-failed frame instead of closing it, so crc_errors is
+    // not a subset of frames here and valid_frames cannot be derived by
+    // subtraction - it has to be counted directly.
+    CHECK(stats.valid_frames == delivered.size());
+    CHECK(stats.valid_frames == stats.frames);
 
     // The frame immediately after the corrupted+truncated pair must be the clean
     // resync header (0164FEC603, evaporator_2 min/max) - proves the bad

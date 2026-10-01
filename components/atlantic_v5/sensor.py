@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome import final_validate
 from esphome.components import sensor
 import esphome.config_validation as cv
 from esphome.const import (
@@ -8,7 +9,13 @@ from esphome.const import (
     UNIT_CELSIUS,
 )
 
-from . import CONF_ATLANTIC_V5_ID, AtlanticV5Component, EntityKind
+from . import (
+    CONF_ATLANTIC_V5_ID,
+    CONF_MODE,
+    MODE_MITM,
+    AtlanticV5Component,
+    EntityKind,
+)
 
 DEPENDENCIES = ["atlantic_v5"]
 CODEOWNERS = ["@jsimonetti"]
@@ -68,13 +75,19 @@ SENSORS = {
     "cycle_4_count": ("ENT_CYCLE_4_COUNT", _count_schema()),
     "cycle_5_count": ("ENT_CYCLE_5_COUNT", _count_schema()),
     "cycle_6_count": ("ENT_CYCLE_6_COUNT", _count_schema()),
-    # Diagnostics, off by default: frames_ok/crc_errors/resyncs/
-    # dropped_bytes are per-side totals in mitm mode, single-assembler totals
-    # in listener mode (see AtlanticV5Component::update_diagnostics).
-    "frames_ok": ("ENT_FRAMES_OK", _count_schema()),
+    # Framing diagnostics, off by default. One assembler per wire, so the set
+    # that means anything depends on the mode: listener taps a single wire and
+    # uses the unsuffixed keys, mitm sits between two and publishes each side
+    # separately. _final_validate rejects the wrong set for the mode.
+    "valid_frames": ("ENT_VALID_FRAMES", _count_schema()),
     "crc_errors": ("ENT_CRC_ERRORS", _count_schema()),
-    "resyncs": ("ENT_RESYNCS", _count_schema()),
     "dropped_bytes": ("ENT_DROPPED_BYTES", _count_schema()),
+    "valid_frames_hmi": ("ENT_VALID_FRAMES_HMI", _count_schema()),
+    "crc_errors_hmi": ("ENT_CRC_ERRORS_HMI", _count_schema()),
+    "dropped_bytes_hmi": ("ENT_DROPPED_BYTES_HMI", _count_schema()),
+    "valid_frames_main": ("ENT_VALID_FRAMES_MAIN", _count_schema()),
+    "crc_errors_main": ("ENT_CRC_ERRORS_MAIN", _count_schema()),
+    "dropped_bytes_main": ("ENT_DROPPED_BYTES_MAIN", _count_schema()),
     "unknown_frames": ("ENT_UNKNOWN_FRAMES", _count_schema()),
     "length_mismatches": ("ENT_LENGTH_MISMATCHES", _count_schema()),
     "text_length_variants": ("ENT_TEXT_LENGTH_VARIANTS", _count_schema()),
@@ -94,6 +107,32 @@ CONFIG_SCHEMA = cv.Schema(
         **{cv.Optional(key): schema for key, (_ent_id, schema) in SENSORS.items()},
     }
 )
+
+# The three framing counters, which exist once per assembler. Listed here as
+# well as in SENSORS because SENSORS has to stay literal for
+# test/host/test_catalog_parity.py to parse it; the assert below is what keeps
+# the two from drifting, since a key that falls out of the gate silently reads
+# zero forever - the exact symptom these counters exist to make unambiguous.
+_FRAMING_COUNTERS = ("valid_frames", "crc_errors", "dropped_bytes")
+_REJECTED_IN_MITM = {base: f"{base}_hmi / {base}_main" for base in _FRAMING_COUNTERS}
+_REJECTED_IN_LISTENER = {f"{base}_{side}": base for base in _FRAMING_COUNTERS for side in ("hmi", "main")}
+assert not (_REJECTED_IN_MITM.keys() | _REJECTED_IN_LISTENER.keys()) - SENSORS.keys()
+
+
+def _final_validate(config):
+    fconf = final_validate.full_config.get()
+    hub_path = fconf.get_path_for_id(config[CONF_ATLANTIC_V5_ID])[:-1]
+    mode = fconf.get_config_for_path(hub_path)[CONF_MODE]
+    rejected = _REJECTED_IN_MITM if mode == MODE_MITM else _REJECTED_IN_LISTENER
+    for key, replacement in rejected.items():
+        if key in config:
+            raise cv.Invalid(
+                f"{key} is not available in atlantic_v5 mode: {mode}; use {replacement}",
+                path=[key],
+            )
+
+
+FINAL_VALIDATE_SCHEMA = _final_validate
 
 
 async def to_code(config):

@@ -355,10 +355,18 @@ so they don't clutter a default dashboard:
 ```yaml
 sensor:
   - platform: atlantic_v5
-    frames_ok: {name: DHW frames ok}
+    # listener only — one wire, one assembler:
+    valid_frames: {name: DHW valid frames}
     crc_errors: {name: DHW CRC errors}
-    resyncs: {name: DHW resyncs}
     dropped_bytes: {name: DHW dropped bytes}
+    # mitm only — one assembler per side, reported separately:
+    valid_frames_hmi: {name: DHW valid frames HMI}
+    crc_errors_hmi: {name: DHW CRC errors HMI}
+    dropped_bytes_hmi: {name: DHW dropped bytes HMI}
+    valid_frames_main: {name: DHW valid frames MAIN}
+    crc_errors_main: {name: DHW CRC errors MAIN}
+    dropped_bytes_main: {name: DHW dropped bytes MAIN}
+    # both modes:
     unknown_frames: {name: DHW unknown frames}
     length_mismatches: {name: DHW length mismatches}
     text_length_variants: {name: DHW text length variants}
@@ -396,9 +404,28 @@ dead controller still reads off. It is the one entity to bind an automation or
 an availability template to; the warning and the wall of unknowns are the same
 fact in a form only a human can read.
 
-`frames_ok`/`crc_errors`/`resyncs`/`dropped_bytes` are per-side totals in
-`mitm` mode (HMI + MAIN assemblers summed) and single-assembler totals in
-`listener` mode. `unknown_frames` counts frames whose header appears in
+The three framing counters come in two sets, and exactly one set is valid per
+mode — adding the other is a config error naming its replacement, because an
+unpublished framing counter would sit at zero forever and a framing counter at
+zero means "this side is dead". `mode: listener` taps a single wire and uses
+`valid_frames`/`crc_errors`/`dropped_bytes`. `mode: mitm` sits between two wires
+and publishes `*_hmi` and `*_main` separately; they are never summed, because a
+sum cannot tell "both sides healthy" from "one side unplugged, the other
+floating" — the most common wiring fault.
+
+Read them together, per side: `valid_frames` at zero means that side is
+delivering nothing usable, and `dropped_bytes` then says which fault it is —
+climbing means bytes are arriving but never frame (floating or miswired line,
+wrong baud), staying at zero means nothing is arriving at all (unplugged, wrong
+`rx_pin`). `crc_errors` against `valid_frames` is the noise ratio on a side that
+is otherwise working.
+
+If you are coming from an earlier version: `frames_ok` counted CRC failures too
+and is replaced by `valid_frames` (or its per-side variants in `mitm`), and
+`resyncs` is gone — it was a near-duplicate of `dropped_bytes` under a
+misleading name.
+
+`unknown_frames` counts frames whose header appears in
 neither table of [`docs/protocol.md`](docs/protocol.md)'s message catalogue —
 traffic this component has never seen before (still forwarded/logged, never
 decoded). Headers in the catalogue's *Unmapped messages* table are known,

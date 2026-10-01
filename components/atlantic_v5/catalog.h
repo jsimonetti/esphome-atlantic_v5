@@ -55,13 +55,19 @@ enum EntityId : uint16_t {
   ENT_HMI_VERSION,
   ENT_HMI_MODEL,
 
-  // Diagnostics, off by default; frames_ok/crc_errors/resyncs/
-  // dropped_bytes/unknown_frames are per-side totals in mitm, single-assembler
-  // totals in listener.
-  ENT_FRAMES_OK,
+  // Diagnostics, off by default. The three framing counters come in two
+  // flavours and exactly one flavour is live per mode: the unsuffixed ones in
+  // listener (one assembler, one wire), the _hmi/_main variants in mitm (one
+  // assembler per side, never summed - see README "Diagnostics").
+  ENT_VALID_FRAMES,
   ENT_CRC_ERRORS,
-  ENT_RESYNCS,
   ENT_DROPPED_BYTES,
+  ENT_VALID_FRAMES_HMI,
+  ENT_CRC_ERRORS_HMI,
+  ENT_DROPPED_BYTES_HMI,
+  ENT_VALID_FRAMES_MAIN,
+  ENT_CRC_ERRORS_MAIN,
+  ENT_DROPPED_BYTES_MAIN,
   ENT_UNKNOWN_FRAMES,
   // Decoder payload-validation counters: frames rejected as
   // structurally invalid, and text fields published despite a width this

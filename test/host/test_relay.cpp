@@ -151,9 +151,12 @@ int main() {
     for (size_t i = 0; i < rows.size(); i++)
       CHECK(forwarded_in_order[i] == rows[i].bytes);
 
-    // No CRC errors or resyncs on a clean capture, on either side's assembler.
+    // No CRC errors or dropped bytes on a clean capture, on either side's assembler,
+    // and every closed frame counts as valid.
     CHECK(relay.hmi_stats().crc_errors == 0 && relay.main_stats().crc_errors == 0);
-    CHECK(relay.hmi_stats().resyncs == 0 && relay.main_stats().resyncs == 0);
+    CHECK(relay.hmi_stats().dropped_bytes == 0 && relay.main_stats().dropped_bytes == 0);
+    CHECK(relay.hmi_stats().valid_frames == relay.hmi_stats().frames);
+    CHECK(relay.main_stats().valid_frames == relay.main_stats().frames);
 
     // Forwarding latency budget: <= 1ms excluding fixed transmit time.
     CHECK(relay.stats().latency_samples == rows.size());

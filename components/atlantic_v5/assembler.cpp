@@ -27,7 +27,9 @@ bool FrameAssembler::crc_check(uint8_t len) const {
 }
 
 bool FrameAssembler::finalize(bool crc_ok) {
-  if (!crc_ok)
+  if (crc_ok)
+    stats_.valid_frames++;
+  else
     stats_.crc_errors++;
   stats_.frames++;
   have_frame_ = true;
@@ -50,7 +52,6 @@ bool FrameAssembler::push(uint8_t byte, uint32_t t_us) {
   if (len_ == 0) {
     if (byte != 0x01) {
       stats_.dropped_bytes++;
-      stats_.resyncs++;
       return false;
     }
     buf_[len_++] = byte;
@@ -61,7 +62,6 @@ bool FrameAssembler::push(uint8_t byte, uint32_t t_us) {
   if (len_ == 1) {
     if (byte != 0x64 && byte != 0x65) {
       stats_.dropped_bytes += 2;
-      stats_.resyncs++;
       len_ = 0;
       return false;
     }
@@ -93,7 +93,6 @@ bool FrameAssembler::push(uint8_t byte, uint32_t t_us) {
   size_t expected = static_cast<size_t>(HEADER_LEN) + 1 + buf_[HEADER_LEN] + 2;
   if (expected > MAX_FRAME) {
     stats_.oversize++;
-    stats_.resyncs++;
     stats_.dropped_bytes += len_;
     len_ = 0;
     return false;
@@ -107,7 +106,6 @@ bool FrameAssembler::push(uint8_t byte, uint32_t t_us) {
 
   // Single-bus, CRC failed: no direction info to fall back on, drop and resync (2.5.2 #4).
   stats_.crc_errors++;
-  stats_.resyncs++;
   stats_.dropped_bytes += len_;
   len_ = 0;
   return false;
@@ -130,7 +128,6 @@ bool FrameAssembler::tick(uint32_t t_us) {
     return finalize(ok);
 
   stats_.crc_errors++;
-  stats_.resyncs++;
   stats_.dropped_bytes += len_;
   len_ = 0;
   return false;

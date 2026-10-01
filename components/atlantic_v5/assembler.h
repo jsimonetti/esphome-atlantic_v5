@@ -41,8 +41,10 @@ class FrameAssembler {
 
   struct Stats {
     uint32_t frames = 0;
+    // Counted directly, not derived as frames - crc_errors: single-bus drops a
+    // CRC-failed frame without closing it, so crc_errors is not a subset of frames.
+    uint32_t valid_frames = 0;
     uint32_t crc_errors = 0;
-    uint32_t resyncs = 0;
     uint32_t dropped_bytes = 0;
     uint32_t oversize = 0;
     uint32_t speculative_accepts = 0;

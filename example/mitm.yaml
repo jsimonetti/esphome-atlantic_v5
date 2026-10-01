@@ -95,14 +95,21 @@ sensor:
       name: DHW cycle 5 count
     cycle_6_count:
       name: DHW cycle 6 count
-    frames_ok:
-      name: DHW frames ok
-    crc_errors:
-      name: DHW CRC errors
-    resyncs:
-      name: DHW resyncs
-    dropped_bytes:
-      name: DHW dropped bytes
+    # Framing counters, mitm-only spelling: one assembler per side, reported
+    # separately so a dead side is visible. In mode: listener the unsuffixed
+    # names (valid_frames, crc_errors, dropped_bytes) are used instead.
+    valid_frames_hmi:
+      name: DHW valid frames HMI
+    crc_errors_hmi:
+      name: DHW CRC errors HMI
+    dropped_bytes_hmi:
+      name: DHW dropped bytes HMI
+    valid_frames_main:
+      name: DHW valid frames MAIN
+    crc_errors_main:
+      name: DHW CRC errors MAIN
+    dropped_bytes_main:
+      name: DHW dropped bytes MAIN
     unknown_frames:
       name: DHW unknown frames
     length_mismatches:
