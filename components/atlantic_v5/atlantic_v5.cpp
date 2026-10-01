@@ -162,7 +162,6 @@ void AtlanticV5Component::setup_mitm() {
   cfg.hmi = hmi_io_cfg;
   cfg.main = main_io_cfg;
   cfg.relay.silence_us = this->frame_silence_us_;
-  cfg.relay.echo_drain_us = this->echo_drain_us_;
   cfg.relay.forward_bad_crc = this->forward_bad_crc_;
   cfg.relay_core = this->relay_core_;
 
@@ -226,7 +225,7 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     return;
   this->last_diag_us_ = now_us;
 
-  uint32_t frames_relayed = 0, rewrites_applied = 0, echo_bytes = 0, queue_overflows = 0;
+  uint32_t frames_relayed = 0, rewrites_applied = 0, queue_overflows = 0;
   uint32_t latency_max_us = 0, task_stack_free = 0;
   float latency_avg_us = 0;
   const ::atlantic_v5::Decoder::Stats *dec_stats;
@@ -247,7 +246,6 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     const auto &relay_stats = this->relay_task_->stats();
     frames_relayed = relay_stats.frames_relayed;
     rewrites_applied = relay_stats.rewrites_applied;
-    echo_bytes = relay_stats.echo_bytes;
     latency_max_us = relay_stats.latency_max_us;
     if (relay_stats.latency_samples > 0)
       latency_avg_us = static_cast<float>(relay_stats.latency_total_us) / static_cast<float>(relay_stats.latency_samples);
@@ -267,7 +265,6 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   this->publish_diag_uint(::atlantic_v5::ENT_TEXT_LENGTH_VARIANTS, dec_stats->text_length_variants);
   this->publish_diag_uint(::atlantic_v5::ENT_FRAMES_RELAYED, frames_relayed);
   this->publish_diag_uint(::atlantic_v5::ENT_REWRITES_APPLIED, rewrites_applied);
-  this->publish_diag_uint(::atlantic_v5::ENT_ECHO_BYTES, echo_bytes);
   this->publish_diag_uint(::atlantic_v5::ENT_QUEUE_OVERFLOWS, queue_overflows);
   this->publish_diag_uint(::atlantic_v5::ENT_RELAY_LATENCY_MAX_US, latency_max_us);
   this->publish_diag_float(::atlantic_v5::ENT_RELAY_LATENCY_AVG_US, latency_avg_us);

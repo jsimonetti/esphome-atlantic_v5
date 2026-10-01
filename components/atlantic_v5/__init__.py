@@ -51,7 +51,6 @@ CONF_ONE_WIRE_MIRROR = "one_wire_mirror"
 CONF_RELAY_CORE = "relay_core"
 CONF_FORWARD_BAD_CRC = "forward_bad_crc"
 CONF_FRAME_SILENCE = "frame_silence"
-CONF_ECHO_DRAIN = "echo_drain"
 CONF_DIR_SETUP = "dir_setup"
 CONF_DIR_HOLD = "dir_hold"
 # Referenced by the read-only-entity platform files (sensor.py etc.) to look up
@@ -76,14 +75,13 @@ SINGLE_CORE_VARIANTS = {
     VARIANT_ESP32S2,
 }
 
-# The four bus timing defaults, duplicated from C++ so they show up
+# The three bus timing defaults, duplicated from C++ so they show up
 # in the resolved YAML. Keep in step with FrameAssembler::DEFAULT_SILENCE_US
-# (assembler.h), DEFAULT_ECHO_DRAIN_US (relay.h), and DEFAULT_DIR_SETUP_US /
-# DEFAULT_DIR_HOLD_US (uart_bus_io.h). dir_setup/dir_hold carry no schema
+# (assembler.h) and DEFAULT_DIR_SETUP_US / DEFAULT_DIR_HOLD_US
+# (uart_bus_io.h). dir_setup/dir_hold carry no schema
 # default, so that setting either one in mode: listener can be rejected rather
 # than silently ignored; to_code supplies the fallback instead.
 DEFAULT_FRAME_SILENCE_US = 4000
-DEFAULT_ECHO_DRAIN_US = 200
 DEFAULT_DIR_SETUP_US = 10
 DEFAULT_DIR_HOLD_US = 0
 
@@ -191,9 +189,6 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_FRAME_SILENCE, default=f"{DEFAULT_FRAME_SILENCE_US}us"): cv.All(
                 cv.positive_not_null_time_period, cv.positive_time_period_microseconds
             ),
-            cv.Optional(
-                CONF_ECHO_DRAIN, default=f"{DEFAULT_ECHO_DRAIN_US}us"
-            ): cv.positive_time_period_microseconds,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     _validate_sides,
@@ -209,7 +204,6 @@ async def to_code(config):
     cg.add(var.set_bus_capture(config[CONF_BUS_CAPTURE]))
     cg.add(var.set_timeout(config[CONF_TIMEOUT]))
     cg.add(var.set_frame_silence(config[CONF_FRAME_SILENCE]))
-    cg.add(var.set_echo_drain(config[CONF_ECHO_DRAIN]))
 
     if config[CONF_MODE] == MODE_MITM:
         for key, setter in ((CONF_HMI, var.set_hmi_uart), (CONF_MAIN, var.set_main_uart)):

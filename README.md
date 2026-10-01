@@ -249,7 +249,7 @@ know your board pairs its channels this way.
 
 ## Bus timing
 
-Framing and line turnaround are governed by four timings. The defaults follow
+Framing and line turnaround are governed by three timings. The defaults follow
 the one known-good V5 relay implementation for this bus; they are exposed so
 hardware this project has never seen can be tuned without rebuilding anything.
 Leave them unset unless something is actually wrong.
@@ -257,7 +257,6 @@ Leave them unset unless something is actually wrong.
 | Key | Where | Default | What it does |
 | --- | --- | --- | --- |
 | `frame_silence` | `atlantic_v5:` | `4000us` | Idle time after which a partially received frame is closed and handed on. Raise it if long frames are being cut in half; lower it only if you know the bus is faster than this component assumes. Must be non-zero. |
-| `echo_drain` | `atlantic_v5:` | `200us` | `mitm` only. Bytes arriving on a side within this window of a write *to* that side are treated as the transceiver's own echo and discarded. Too low and your own transmissions get relayed back; too high and a fast reply from the other end is swallowed. |
 | `dir_setup` | `hmi:` / `main:` | `10us` | `mitm`, Case A only. Delay between asserting DIR and starting to write. |
 | `dir_hold` | `hmi:` / `main:` | `0us` | `mitm`, Case A only. How long DIR stays asserted after the last byte has shifted out. Raise it only if the far end is missing the tail of your frames — every microsecond here is time the transceiver is still driving the bus, which can clip the start of the reply. |
 
@@ -270,7 +269,6 @@ atlantic_v5:
   id: dhw
   mode: mitm
   frame_silence: 4000us
-  echo_drain: 200us
   hmi:
     uart_num: 1
     rx_pin: GPIO7
@@ -386,7 +384,6 @@ sensor:
     # mitm-only (stay at 0 in listener mode):
     frames_relayed: {name: DHW frames relayed}
     rewrites_applied: {name: DHW rewrites applied}
-    echo_bytes: {name: DHW echo bytes}
     queue_overflows: {name: DHW queue overflows}
     relay_latency_max_us: {name: DHW relay latency max}
     relay_latency_avg_us: {name: DHW relay latency avg}
@@ -507,16 +504,21 @@ answer is hard. If you have hardware and can help close one, please do:
 
 Everything else in this component is verified against recorded bus captures
 and the host test suite. These things genuinely cannot be proven without a
-devkit wired to loopback GPIOs or a live bus, and remain open until someone
-runs them:
+live bus, and remain open until someone runs them:
 
-- Byte-identical relayed output with GPIOs looped back (TX of one side to RX
-  of the other and vice versa), injecting real capture traffic on one side.
+- **A rewrite actually taking effect.** Relaying has been confirmed inline on
+  a live appliance — an 11.6 s `mode: mitm` session answered 25 distinct
+  headers 13 times each, in both directions, which only happens if every
+  forwarded frame arrived intact. But that session ran in passthrough.
+  Forwarding a frame unchanged and *modifying* one on the way through are
+  different code paths, and only the first has been exercised on hardware.
 - Measured last-byte-in to first-byte-out latency, to confirm the < 1 ms
   (excluding transmit time) budget holds on real hardware, not just in the
-  host-side mock-clock model. `relay_latency_avg_us` currently reports
-  last-byte-in to write-*complete*, so it includes the frame's own transmit
-  time (~6.8 ms for a 25-byte frame) and does not answer this on its own.
+  host-side mock-clock model. `relay_latency_avg_us` reports last-byte-in to
+  write-*complete*, so it includes the frame's own transmit time (6.5 ms of
+  wire time for a 25-byte frame at 38400 8N1) and does not answer this on its
+  own. Reading it as if it excluded transmit time is how an earlier
+  investigation convinced itself frames were being truncated; they were not.
 
 ## Building and testing
 

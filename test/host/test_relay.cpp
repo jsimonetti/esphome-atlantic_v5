@@ -252,7 +252,7 @@ int main() {
 
   // --- reset_latency_stats (relay_latency_avg_us/max_us are reset
   // on read): zeroes only the latency fields, leaving the plain cumulative
-  // counters (frames_relayed, rewrites_applied, echo_bytes) untouched. ---
+  // counters (frames_relayed, rewrites_applied) untouched. ---
   {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
     MockBusIo hmi_io, main_io;
@@ -339,9 +339,10 @@ int main() {
     }
   }
 
-  // --- Echo accounting: bytes arriving on a side within
-  // echo_drain_us of a write to that same side are our own echo — discarded,
-  // counted, and never mistaken for a new frame to relay back. ---
+  // --- Echo suppression: bytes arriving on a side within
+  // echo_drain_us of a write to that same side are our own echo — dropped, and
+  // never mistaken for a new frame to relay back. The echo here is a complete,
+  // CRC-valid frame, so without the window it would be relayed. ---
   {
     MockBusIo hmi_io, main_io;
     RelayPolicy policy;
@@ -367,7 +368,6 @@ int main() {
     main_io.set_now(1050);
     relay.poll(1050);
 
-    CHECK(relay.stats().echo_bytes == req.size());
     CHECK(relay.stats().frames_relayed == 1);  // unchanged: the echo was not relayed
     CHECK(main_io.writes_.size() == 1);
     CHECK(hmi_io.writes_.empty());

@@ -94,7 +94,6 @@ SENSORS = {
     # mitm-only; stay at 0 in listener mode (no Relay/RelayTask there).
     "frames_relayed": ("ENT_FRAMES_RELAYED", _count_schema()),
     "rewrites_applied": ("ENT_REWRITES_APPLIED", _count_schema()),
-    "echo_bytes": ("ENT_ECHO_BYTES", _count_schema()),
     "queue_overflows": ("ENT_QUEUE_OVERFLOWS", _count_schema()),
     "relay_latency_max_us": ("ENT_RELAY_LATENCY_MAX_US", _us_schema()),
     "relay_latency_avg_us": ("ENT_RELAY_LATENCY_AVG_US", _us_schema()),

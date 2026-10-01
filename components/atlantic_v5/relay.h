@@ -17,6 +17,8 @@ inline constexpr uint32_t DEFAULT_ECHO_DRAIN_US = 200;
 // used in a default argument of the enclosing class's own constructor.
 struct RelayConfig {
   uint32_t silence_us = FrameAssembler::DEFAULT_SILENCE_US;  // framing backstop
+  // Not exposed in YAML: flush_input() after each write already discards the
+  // echo, so this only ever catches a byte that lands after that flush.
   uint32_t echo_drain_us = DEFAULT_ECHO_DRAIN_US;
   // Escape hatch for a bus whose framing this component gets wrong: relaying a
   // frame the far end will reject on CRC anyway is only useful if the CRC
@@ -58,8 +60,8 @@ class Relay {
   // are currently available on each side, applies the silence backstop, and
   // forwards any completed frame to the opposite side (running it through the
   // rewrite hook first). Bytes arriving on a side within echo_drain_us of a write
-  // to that same side are treated as our own echo: discarded and counted, never
-  // fed to that side's assembler. A completed frame whose CRC fails is dropped
+  // to that same side are treated as our own echo: discarded, never fed to that
+  // side's assembler. A completed frame whose CRC fails is dropped
   // rather than forwarded unless cfg.forward_bad_crc is set; either way the
   // assembler has already counted it in crc_errors. Call repeatedly with a monotonically
   // non-decreasing now_us (mock clock in host tests, real clock in the relay task).
@@ -68,7 +70,6 @@ class Relay {
   struct Stats {
     uint32_t frames_relayed = 0;
     uint32_t rewrites_applied = 0;
-    uint32_t echo_bytes = 0;
     uint32_t latency_max_us = 0;
     uint64_t latency_total_us = 0;
     uint32_t latency_samples = 0;
@@ -78,7 +79,7 @@ class Relay {
   // relay_latency_avg_us/max_us are reset on read: the diagnostics publish cycle
   // calls this right after reading, so
   // each published value covers "since the last read", not "since boot".
-  // frames_relayed/rewrites_applied/echo_bytes are plain cumulative counters
+  // frames_relayed/rewrites_applied are plain cumulative counters
   // and are never reset.
   void reset_latency_stats() {
     stats_.latency_max_us = 0;

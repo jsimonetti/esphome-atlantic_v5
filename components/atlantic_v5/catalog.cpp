@@ -58,7 +58,6 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "text_length_variants",
     "frames_relayed",
     "rewrites_applied",
-    "echo_bytes",
     "queue_overflows",
     "relay_latency_max_us",
     "relay_latency_avg_us",

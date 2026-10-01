@@ -50,9 +50,8 @@ class AtlanticV5Component : public Component {
   void set_timeout(uint32_t timeout_ms) { timeout_us_ = timeout_ms * 1000ULL; }
 
   // Bus timing knobs. frame_silence is the framing backstop used
-  // by every assembler in both modes; echo_drain is mitm-only.
+  // by every assembler in both modes.
   void set_frame_silence(uint32_t us) { frame_silence_us_ = us; }
-  void set_echo_drain(uint32_t us) { echo_drain_us_ = us; }
 
   // MITM-mode side wiring. tx_enable_pin -1 means no DIR pin;
   // one_wire_mirror selects the shared-pin transceiver. Called once per side from
@@ -156,7 +155,6 @@ class AtlanticV5Component : public Component {
   int rx_pin_{-1};
   uint32_t timeout_us_{60'000'000};  // default 60s
   uint32_t frame_silence_us_{::atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US};
-  uint32_t echo_drain_us_{::atlantic_v5::DEFAULT_ECHO_DRAIN_US};
 
   ::atlantic_v5::Listener listener_;
   void *entities_[::atlantic_v5::ENT_COUNT]{};

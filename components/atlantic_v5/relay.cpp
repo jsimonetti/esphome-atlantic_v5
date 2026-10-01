@@ -28,15 +28,12 @@ void Relay::service(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   if (capture_sink_ != nullptr)
     capture_sink_(capture_ctx_, in_channel, buf, static_cast<size_t>(n), now_us);
 
-  if (n > 0) {
-    if (now_us < in.echo_until_us) {
-      // Our own echo of a write to this side (3.5.3): discard, never frame it.
-      stats_.echo_bytes += static_cast<uint32_t>(n);
-    } else {
-      for (int i = 0; i < n; i++) {
-        if (in.asm_.push(buf[i], now_us))
-          forward(in, out, in_channel, now_us);
-      }
+  // Bytes arriving inside the echo window are our own echo of a write to this
+  // side (3.5.3): dropped on the floor, never framed.
+  if (n > 0 && now_us >= in.echo_until_us) {
+    for (int i = 0; i < n; i++) {
+      if (in.asm_.push(buf[i], now_us))
+        forward(in, out, in_channel, now_us);
     }
   }
 

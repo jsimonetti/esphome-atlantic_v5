@@ -23,7 +23,6 @@ atlantic_v5:
   timeout: 60s
   # Bus timing (defaults shown; uncomment to tune on unfamiliar hardware).
   # frame_silence: 4000us
-  # echo_drain: 200us
   hmi:
     uart_num: 1
     rx_pin: GPIO7
@@ -119,8 +118,6 @@ sensor:
       name: DHW frames relayed
     rewrites_applied:
       name: DHW rewrites applied
-    echo_bytes:
-      name: DHW echo bytes
     queue_overflows:
       name: DHW queue overflows
     relay_latency_max_us:
