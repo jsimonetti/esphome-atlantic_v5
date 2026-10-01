@@ -139,6 +139,15 @@ to state 0, field 3 increments. Therefore `active = (secs_in_state1 > 0)` and
 `count = field3`. The physical meaning of each of the six cycles is not
 established.
 
+**The `active` polarity is in doubt.** In `real_single_bus_idle_polling.csv`,
+recorded on an Explorer V5 standing idle, all six frames report field 1 = 0 and
+field 2 ticking up one per second in lock-step, while `0x0164FF1403` reports
+`heating active = 0` throughout. Reading field 2 as "the active state" therefore
+labels an idle machine as six-for-six active, which is self-contradictory; state
+1 looks like the *idle* state and the mapping above looks inverted. The decoder
+still follows the rule as written, because flipping it on one idle capture would
+be trading one unverified polarity for another — see open question 7.
+
 **Text field widths are documented, not enforced.** The `Len` column below
 records the width every observed firmware uses, but the decoder validates a
 `text` payload structurally — it must fit the frame as actually received and
@@ -220,12 +229,18 @@ rewritten.
 | `0x0165FDFB02` | H | init | 2 | `0011` |
 | `0x0165FDFE02` | H | init | 2 | `0001` |
 | `0x0165FEF701` | H | 1 s | 1 | `00` |
-| `0x0165FEF901` | H | event | 1 | `00` or `64` — correlates with heat pump start/stop |
-| `0x0165FEFB01` | H | event | 1 | `00` or `64` — correlates with heat pump start/stop |
+| `0x0165FEF901` | H | 1 s | 1 | `00` or `64` — correlates with heat pump start/stop |
+| `0x0165FEFB01` | H | 1 s | 1 | `00` or `64` — correlates with heat pump start/stop |
 | `0x0165FEFD01` | H | 1 s | 1 | `00` |
 | `0x0165FEFF01` | H | 1 s | 1 | `00` |
-| `0x0165FF0101` | H | event | 5 | `0000000000` or `FFFFFFFF64` — correlates with heat pump start/stop |
-| `0x0165FF0301` | H | event | 1 | `00` or `2D` — correlates with heat pump start/stop |
+| `0x0165FF0101` | H | 1 s | 5 | `0000000000` or `FFFFFFFF64` — correlates with heat pump start/stop |
+| `0x0165FF0301` | H | 1 s | 1 | `00` or `2D` — correlates with heat pump start/stop |
+
+The four start/stop-correlated headers were previously listed with an `event`
+cadence. `real_single_bus_idle_polling.csv` shows all four polled every round
+alongside everything else, carrying their idle payload; it is the *value* that
+is event-driven, not the frame. Every length and idle payload in this table that
+appears in that capture matched it exactly.
 
 Payload-less headers also observed during initialisation: `0x01640165FE`,
 `0x016443130D`. Forward, count, ignore.
@@ -297,3 +312,6 @@ A user with hardware can close these:
 6. What do the four activation-correlated unmapped headers (`0x0165FEF901`,
    `0x0165FEFB01`, `0x0165FF0101`, `0x0165FF0301`) actually encode? A capture
    spanning a full activation and deactivation cycle would settle it.
+7. Is the cycle `active` polarity inverted? The same activation capture settles
+   it: if field 1 starts counting while `0x0164FF1403` reports heating, state 0
+   is the active state and `active = (secs_in_state0 > 0)`.

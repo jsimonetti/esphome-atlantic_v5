@@ -30,6 +30,23 @@ qualifies a capture as golden.
 matching `external_*.csv`, kept for manual inspection only — not a golden
 file, not asserted by any test, gitignored like its source capture.
 
+`real_*.csv` are this project's own hardware captures. Each one's leading `#`
+comment lines record what the machine was doing, how much of the session was
+kept, and whether anything was altered. A `real_*.csv` is still not *by itself*
+a licence to freeze a golden: the rule above stands, and what qualifies a
+capture is the human review, recorded in the ticket that harvested it.
+
+`real_single_bus_idle_polling.csv` is 6.84 s of an Explorer V5 standing idle:
+ten HMI polling rounds, 502 frames, zero CRC errors, 25 distinct headers (13
+mapped, 12 unmapped, none unknown). It exercises the `temp`, `minmax`, `cycle`
+and `bool` codecs on real bytes. A sample of each was decoded by hand from
+[`docs/protocol.md`](../../docs/protocol.md) and compared to the replay output
+before the golden was frozen (the frame-by-frame working is in ticket 02), and
+every length and idle payload in that document's *Unmapped messages* table that
+occurs here matched it. The session has no init burst, so `text`, `u16` and
+`u32` are still unproven on real hardware, and so is anything that only happens
+during an activation.
+
 ## Recording your own capture
 
 Set `bus_capture: true` on the `atlantic_v5:` hub, flash a devkit tapped onto
@@ -49,6 +66,16 @@ microseconds since boot and the replay parser holds `t_us` in a `uint32`,
 which wraps after ~71 minutes — so a single capture must stay shorter than
 that, whatever the uptime when you started. Pass `--no-rebase` to keep the raw
 numbers.
+
+It also stitches buffer-full chunks back together. The device flushes a chunk
+either because the bus fell silent — a real frame boundary — or because its
+32-byte buffer filled in the middle of a burst, which is an artefact of the
+logger and not something that happened on the wire. Left alone, the second kind
+reads back as a gap longer than the silence backstop, so the replay assembler
+closes the half-frame it is holding and resyncs: on the session behind
+`real_single_bus_idle_polling.csv` that silently lost a quarter of all frames,
+with no CRC errors to show for it. Pass `--no-merge-continuations` to see the
+raw chunks.
 
 Malformed lines are reported, not skipped: if the converter errors, the log
 is truncated or interleaved, not the bus.

@@ -18,6 +18,10 @@ clock is `esp_timer` microseconds since boot, and the replay parser holds
 t_us in a uint32, which wraps after ~71 minutes of uptime. Rebasing buys a
 capture taken at any uptime, as long as the capture itself is under ~71
 minutes long. Pass --no-rebase to keep the device's raw numbers.
+
+Chunks the device flushed because its buffer filled, rather than because the
+bus fell silent, are stitched back onto the preceding chunk by default; see
+CAPTURE_BUF_LEN. Pass --no-merge-continuations to keep them separate.
 """
 
 from __future__ import annotations
@@ -25,6 +29,8 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import dataclass
+from typing import Iterable
 
 # ESPHome colours log lines when attached to a tty; the recording may keep them.
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -35,6 +41,29 @@ HEX_RE = re.compile(r"^[0-9A-F]+$")
 
 VALID_CHANNELS = ("hmi", "main", "bus")
 UINT32_MAX = 0xFFFFFFFF
+
+# BusCaptureLogger::BUF_LEN. The device flushes a chunk either because the bus
+# went quiet for the silence backstop (a real frame boundary) or because this
+# buffer filled mid-burst (an artefact of the logger, not of the wire). Only the
+# second kind is exactly this long, so a chunk of exactly this size is taken to
+# mean the next chunk for that channel continues it with no gap in between.
+#
+# That is a heuristic, not a guarantee: a burst ending exactly on this boundary
+# is glued to the burst after it and its start time is lost. The timestamps
+# cannot tell the two cases apart, because a buffer-full flush and the chunk
+# continuing it are themselves tens of milliseconds apart. The damage is bounded
+# — frames are length-delimited and CRC-checked, so all that is lost is the
+# silence backstop between those two bursts.
+CAPTURE_BUF_LEN = 32
+
+
+@dataclass
+class Chunk:
+    """One row of a capture CSV: a run of bytes recorded under a single timestamp."""
+
+    t_us: int
+    channel: str
+    hex_bytes: str
 
 
 class ParseError(Exception):
@@ -60,12 +89,32 @@ def parse_line(line: str, lineno: int) -> tuple[int, str, str] | None:
     return int(t_us), channel, hex_bytes
 
 
-def convert(lines, rebase: bool = True) -> tuple[list[str], list[str]]:
-    """Convert log lines to CSV rows. Returns (rows, warnings)."""
-    rows: list[str] = []
+def convert(
+    lines: Iterable[str], rebase: bool = True, merge_continuations: bool = True
+) -> tuple[list[str], list[str]]:
+    """Convert ESPHome log lines to capture CSV rows.
+
+    Args:
+        lines: Lines of an `esphome logs` recording. Anything that is not a
+            BUSCAP line is ignored.
+        rebase: Subtract the first chunk's timestamp from every chunk, so the
+            capture starts at zero and survives the replay parser's uint32.
+        merge_continuations: Stitch each buffer-full chunk back onto the chunk
+            it continues; see CAPTURE_BUF_LEN.
+
+    Returns:
+        The CSV rows, and any warnings worth showing the operator.
+
+    Raises:
+        ParseError: A BUSCAP line was found but could not be trusted.
+    """
+    chunks: list[Chunk] = []
     warnings: list[str] = []
     base: int | None = None
     previous_t: int | None = None
+    # Per channel, the chunk a continuation would extend. The device buffers the
+    # channels separately, so they continue independently of each other.
+    open_chunk: dict[str, Chunk] = {}
 
     for lineno, line in enumerate(lines, start=1):
         parsed = parse_line(line, lineno)
@@ -88,9 +137,17 @@ def convert(lines, rebase: bool = True) -> tuple[list[str], list[str]]:
                 f"line {lineno}: timestamp {t_out} exceeds uint32; the replay parser will "
                 "truncate it — split the capture or re-record a shorter one"
             )
-        rows.append(f"{t_out},{channel},{hex_bytes}")
 
-    return rows, warnings
+        chunk = open_chunk.pop(channel, None)
+        if chunk is None:
+            chunk = Chunk(t_out, channel, hex_bytes)
+            chunks.append(chunk)
+        else:
+            chunk.hex_bytes += hex_bytes
+        if merge_continuations and len(hex_bytes) == CAPTURE_BUF_LEN * 2:
+            open_chunk[channel] = chunk
+
+    return [f"{c.t_us},{c.channel},{c.hex_bytes}" for c in chunks], warnings
 
 
 def main() -> int:
@@ -109,10 +166,17 @@ def main() -> int:
         action="store_false",
         help="keep the device's raw uptime timestamps instead of rebasing onto the first chunk",
     )
+    parser.add_argument(
+        "--no-merge-continuations",
+        dest="merge_continuations",
+        action="store_false",
+        help=f"keep buffer-full ({CAPTURE_BUF_LEN}-byte) chunks as separate rows instead of "
+        "stitching them back onto the chunk they continue",
+    )
     args = parser.parse_args()
 
     try:
-        rows, warnings = convert(args.input, rebase=args.rebase)
+        rows, warnings = convert(args.input, rebase=args.rebase, merge_continuations=args.merge_continuations)
     except ParseError as err:
         print(f"error: {err}", file=sys.stderr)
         return 1

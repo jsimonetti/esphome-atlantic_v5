@@ -33,16 +33,23 @@ std::string read_file(const std::string &path) {
 int main() {
   replay::ChannelOf single_bus = [](const std::string & /*name*/) { return atlantic_v5::Channel::BUS; };
 
-  auto rows = replay::load_capture(std::string(CAPTURES_DIR) + "/real_single_bus_version_poll.csv", single_bus);
-  CHECK(!rows.empty());
-  auto lines = replay::replay_single_bus(rows);
+  for (const char *name : {"real_single_bus_version_poll", "real_single_bus_idle_polling"}) {
+    const std::string stem = std::string(CAPTURES_DIR) + "/" + name;
+    auto rows = replay::load_capture(stem + ".csv", single_bus);
+    CHECK(!rows.empty());
+    auto lines = replay::replay_single_bus(rows);
 
-  std::string actual;
-  for (const auto &line : lines)
-    actual += line + "\n";
+    std::string actual;
+    for (const auto &line : lines)
+      actual += line + "\n";
 
-  std::string expected = read_file(std::string(CAPTURES_DIR) + "/real_single_bus_version_poll.expected.json");
-  CHECK(actual == expected);
+    // The harness prints no message, so name the capture before comparing;
+    // otherwise a failure here is just a line number shared by both captures.
+    std::string expected = read_file(stem + ".expected.json");
+    if (actual != expected)
+      std::printf("golden mismatch for %s\n", name);
+    CHECK(actual == expected);
+  }
 
   TEST_MAIN_RETURN();
 }
