@@ -396,7 +396,6 @@ sensor:
 text_sensor:
   - platform: atlantic_v5
     last_unknown_frame: {name: DHW last unknown frame}   # rate-limited, ~1/10s
-    last_frame_dump: {name: DHW last frame dump}          # see raw_frame_dump below
 
 binary_sensor:
   - platform: atlantic_v5
@@ -404,7 +403,7 @@ binary_sensor:
 
 switch:
   - platform: atlantic_v5
-    raw_frame_dump: {name: DHW raw frame dump}
+    log_raw_frames: {name: DHW log raw frames}
 ```
 
 `connected` reports whether the appliance is still talking, in both modes. It
@@ -446,7 +445,7 @@ routine traffic with no established meaning; they are not counted here and
 are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
 `last_unknown_frame` publishes the most recent such header as hex
 (e.g. `0164DEAD01`) so it can be reported upstream; with the
-`raw_frame_dump` switch on, the frame's payload hex is appended after a
+`log_raw_frames` switch on, the frame's payload hex is appended after a
 space (e.g. `0164DEAD01 BEEF`).
 
 `length_mismatches` counts frames whose payload was rejected as structurally
@@ -461,7 +460,7 @@ firmware revision disagrees with the catalogue and is worth reporting; both
 counters also emit a rate-limited warning log naming the header and the two
 lengths.
 
-### `raw_frame_dump` vs `bus_capture`
+### `log_raw_frames` vs `bus_capture`
 
 These solve two different problems and are easy to confuse:
 
@@ -471,11 +470,14 @@ These solve two different problems and are easy to confuse:
   `BUSCAP,<t_us>,<channel>,<hex>` lines under the `atlantic_v5.bus_capture`
   logger tag — see `test/captures/README.md` for the converter script that
   turns those log lines into a canonical capture file.
-- **`raw_frame_dump`** (the switch above) is post-assembly, post-CRC-check hex
-  logging of already-framed frames to the `last_frame_dump` text sensor, for
-  live debugging of a specific header you're trying to understand. It's
-  rate-limited (~5/s) and says nothing about framing/CRC health — that's what
-  the counters above are for.
+- **`log_raw_frames`** (the switch above) is post-assembly, post-CRC-check hex
+  logging of already-framed frames, for live debugging of a specific header
+  you're trying to understand. It writes a `frame <channel> <hex>` line at
+  `DEBUG` level under the `atlantic_v5` logger tag and publishes no entity, so
+  it costs nothing in Home Assistant state churn. Every CRC-valid frame is
+  logged while the switch is on, which on a live bus is a lot — leave it off
+  unless you are watching. It says nothing about framing/CRC health, either;
+  that's what the counters above are for.
 
 ## Open protocol questions
 

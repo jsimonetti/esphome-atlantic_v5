@@ -8,14 +8,14 @@ namespace atlantic_v5_component {
 // Off by default, like every other diagnostic; switch_::Switch's own
 // RESTORE_MODE_ALWAYS_OFF default (switch.py) means no explicit state to
 // publish here beyond keeping the hub's flag in sync at boot.
-void AtlanticV5RawFrameDumpSwitch::setup() {
+void AtlanticV5LogRawFramesSwitch::setup() {
   this->publish_state(false);
-  this->parent_->set_raw_frame_dump(false);
+  this->parent_->set_log_raw_frames(false);
 }
 
-void AtlanticV5RawFrameDumpSwitch::write_state(bool state) {
+void AtlanticV5LogRawFramesSwitch::write_state(bool state) {
   this->publish_state(state);
-  this->parent_->set_raw_frame_dump(state);
+  this->parent_->set_log_raw_frames(state);
 }
 
 }  // namespace atlantic_v5_component

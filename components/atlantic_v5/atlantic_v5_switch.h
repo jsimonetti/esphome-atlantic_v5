@@ -1,5 +1,5 @@
-// L3 ESPHome glue. The raw_frame_dump switch: writes into the hub's
-// raw_frame_dump_ flag, so it earns its own dedicated class (ADR 0001), unlike
+// L3 ESPHome glue. The log_raw_frames switch: writes into the hub's
+// log_raw_frames_ flag, so it earns its own dedicated class (ADR 0001), unlike
 // the read-only sensor/binary_sensor/text_sensor platforms.
 #pragma once
 
@@ -20,9 +20,9 @@
 namespace esphome {
 namespace atlantic_v5_component {
 
-class AtlanticV5RawFrameDumpSwitch : public Component,
-                                      public switch_::Switch,
-                                      public Parented<AtlanticV5Component> {
+class AtlanticV5LogRawFramesSwitch : public Component,
+                                     public switch_::Switch,
+                                     public Parented<AtlanticV5Component> {
  public:
   void setup() override;
 

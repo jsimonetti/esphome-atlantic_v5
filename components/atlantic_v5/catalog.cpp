@@ -64,7 +64,6 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "relay_latency_avg_us",
     "task_stack_free",
     "last_unknown_frame",
-    "last_frame_dump",
     "connected",
 };
 }  // namespace

@@ -68,5 +68,5 @@ The I1/I2 values MAIN actually acts on — equal to the observed input under pas
 Raw, pre-assembly byte+timestamp logging, used to harvest real `test/captures/*.csv` files from a user's own hardware. Runs upstream of the FrameAssembler; needs no decode logic.
 _Avoid_: raw frame dump, capture log
 
-**Frame dump** (`raw_frame_dump`):
-Post-assembly, post-decode hex logging of already-framed frames, for live debugging. Distinct from bus capture, which is pre-assembly and produces test fixtures, not debug output.
+**Frame log** (`log_raw_frames`):
+Post-assembly, post-CRC-check hex logging of already-framed frames to the ESPHome log, for live debugging. Publishes no entity. Distinct from bus capture, which is pre-assembly and produces test fixtures, not debug output.

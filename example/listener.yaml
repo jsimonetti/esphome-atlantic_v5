@@ -131,10 +131,8 @@ text_sensor:
       name: DHW HMI model
     last_unknown_frame:
       name: DHW last unknown frame
-    last_frame_dump:
-      name: DHW last frame dump
 
 switch:
   - platform: atlantic_v5
-    raw_frame_dump:
-      name: DHW raw frame dump
+    log_raw_frames:
+      name: DHW log raw frames

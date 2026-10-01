@@ -35,6 +35,17 @@ void format_header_hex(uint64_t key, char *out) {
     bytes[i] = static_cast<uint8_t>(key >> ((::atlantic_v5::HEADER_LEN - 1 - i) * 8));
   to_hex(bytes, sizeof(bytes), out);
 }
+
+const char *channel_name(::atlantic_v5::Channel ch) {
+  switch (ch) {
+    case ::atlantic_v5::Channel::HMI:
+      return "HMI";
+    case ::atlantic_v5::Channel::MAIN:
+      return "MAIN";
+    default:
+      return "BUS";
+  }
+}
 }  // namespace
 
 void AtlanticV5Component::setup() {
@@ -88,7 +99,7 @@ void AtlanticV5Component::setup_listener() {
 
   this->listener_.set_silence_us(this->frame_silence_us_);
   this->listener_.set_sink(&AtlanticV5Component::publish_trampoline, this);
-  this->listener_.set_frame_sink(&AtlanticV5Component::frame_dump_trampoline, this);
+  this->listener_.set_frame_sink(&AtlanticV5Component::frame_log_trampoline, this);
 }
 
 void AtlanticV5Component::loop_listener() {
@@ -178,9 +189,9 @@ void AtlanticV5Component::loop_mitm() {
       this->last_main_us_ = ev.t_us;
       this->seen_main_ = true;
     }
-    // Dump before restoring: raw_frame_dump exists to show what went out on the
+    // Log before restoring: log_raw_frames exists to show what went out on the
     // wire, which is the rewritten frame.
-    this->maybe_dump_frame(f, ev.t_us);
+    this->maybe_log_frame(f);
     // ADR 0002: the input entities report the observed input, so put the
     // pre-rewrite payload back before decoding.
     if (ev.modified)
@@ -302,9 +313,9 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   char hex[(::atlantic_v5::HEADER_LEN + ::atlantic_v5::MAX_PAYLOAD) * 2 + 2];
   format_header_hex(dec_stats->last_unknown_header, hex);
   // The payload is what actually identifies a new message, but it is only
-  // useful while someone is watching, so it rides on the raw_frame_dump switch
+  // useful while someone is watching, so it rides on the log_raw_frames switch
   // rather than on a config key of its own.
-  if (this->raw_frame_dump_ && dec_stats->last_unknown_payload_len > 0) {
+  if (this->log_raw_frames_ && dec_stats->last_unknown_payload_len > 0) {
     size_t n = ::atlantic_v5::HEADER_LEN * 2;
     hex[n++] = ' ';
     to_hex(dec_stats->last_unknown_payload, dec_stats->last_unknown_payload_len, hex + n);
@@ -312,23 +323,18 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   static_cast<text_sensor::TextSensor *>(obj)->publish_state(hex);
 }
 
-void AtlanticV5Component::maybe_dump_frame(const ::atlantic_v5::Frame &f, uint32_t t_us) {
-  if (!this->raw_frame_dump_)
+void AtlanticV5Component::maybe_log_frame(const ::atlantic_v5::Frame &f) {
+  if (!this->log_raw_frames_)
     return;
-  if (t_us - this->last_frame_dump_us_ < 200'000)  // rate-limited, 200ms
-    return;
-  this->last_frame_dump_us_ = t_us;
 
-  void *obj = this->entities_[::atlantic_v5::ENT_LAST_FRAME_DUMP];
-  if (obj == nullptr || this->kinds_[::atlantic_v5::ENT_LAST_FRAME_DUMP] != EntityKind::TEXT_SENSOR)
-    return;
   char hex[::atlantic_v5::MAX_FRAME * 2 + 1];
   to_hex(f.raw(), f.raw_len(), hex);
-  static_cast<text_sensor::TextSensor *>(obj)->publish_state(hex);
+  ESP_LOGD(TAG, "frame %s %s", channel_name(f.channel()), hex);
 }
 
-void AtlanticV5Component::frame_dump_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us) {
-  static_cast<AtlanticV5Component *>(ctx)->maybe_dump_frame(f, t_us);
+void AtlanticV5Component::frame_log_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us) {
+  (void) t_us;
+  static_cast<AtlanticV5Component *>(ctx)->maybe_log_frame(f);
 }
 #endif
 

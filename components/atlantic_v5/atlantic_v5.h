@@ -35,7 +35,7 @@ enum class Mode : uint8_t { LISTENER, MITM };
 
 // Which ESPHome platform an entities_[] slot holds. Only
 // read-only entities register through this generic path (ADR 0001); the
-// control_mode select and raw_frame_dump switch are controllable and get
+// control_mode select and log_raw_frames switch are controllable and get
 // their own dedicated classes (atlantic_v5_select.h, atlantic_v5_switch.h).
 enum class EntityKind : uint8_t { SENSOR, BINARY_SENSOR, TEXT_SENSOR };
 
@@ -73,9 +73,9 @@ class AtlanticV5Component : public Component {
   // mode - unreachable anyway, since select.py rejects control_mode there.
   void set_control_mode(::atlantic_v5::ControlMode mode);
 
-  // The raw_frame_dump switch's write path: gates whether
-  // already-framed, already-decoded frames get hex-dumped to a text sensor.
-  void set_raw_frame_dump(bool enabled) { this->raw_frame_dump_ = enabled; }
+  // The log_raw_frames switch's write path: gates whether
+  // already-framed, CRC-valid frames get hex-logged at DEBUG level.
+  void set_log_raw_frames(bool enabled) { this->log_raw_frames_ = enabled; }
 
   void setup() override;
   void loop() override;
@@ -109,11 +109,11 @@ class AtlanticV5Component : public Component {
   void publish_diag_uint(uint16_t id, uint32_t value);
   void publish_diag_float(uint16_t id, float value);
 
-  // raw_frame_dump: fired for every already-framed, CRC-valid frame
+  // log_raw_frames: fired for every already-framed, CRC-valid frame
   // in both modes - directly from loop_mitm()'s decoded FrameEvents, and via
-  // Listener::FrameSink in listener mode (frame_dump_trampoline).
-  void maybe_dump_frame(const ::atlantic_v5::Frame &f, uint32_t t_us);
-  static void frame_dump_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
+  // Listener::FrameSink in listener mode (frame_log_trampoline).
+  void maybe_log_frame(const ::atlantic_v5::Frame &f);
+  static void frame_log_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
 
   // Per-side MITM config; unused in listener mode.
   struct SideConfig {
@@ -148,11 +148,10 @@ class AtlanticV5Component : public Component {
   uint32_t last_unknown_headers_seen_{0};
   uint32_t last_length_anomaly_us_{0};
   uint64_t last_logged_anomaly_header_{0};
-  uint32_t last_frame_dump_us_{0};
 #endif
   Mode mode_{Mode::LISTENER};
   bool bus_capture_{false};
-  bool raw_frame_dump_{false};
+  bool log_raw_frames_{false};
   int uart_num_{1};
   int rx_pin_{-1};
   uint32_t timeout_us_{60'000'000};  // default 60s
