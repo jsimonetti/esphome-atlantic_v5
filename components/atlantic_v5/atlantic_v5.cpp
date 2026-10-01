@@ -154,7 +154,6 @@ void AtlanticV5Component::setup_mitm() {
   cfg.relay.echo_drain_us = this->echo_drain_us_;
   cfg.relay.forward_bad_crc = this->forward_bad_crc_;
   cfg.relay_core = this->relay_core_;
-  cfg.self_test = this->self_test_;
 
   this->relay_task_ = new ::atlantic_v5::RelayTask(cfg, this->policy_);
   if (this->bus_capture_) {
@@ -163,13 +162,6 @@ void AtlanticV5Component::setup_mitm() {
     this->relay_task_->set_capture_sink(&AtlanticV5Component::capture_sink_trampoline, this);
   }
   this->relay_task_->begin();
-
-  // The self-test result is published as a diagnostic text sensor and never
-  // blocks the relay: begin() already ran it
-  // synchronously before spawning the relay task, so the result is ready now.
-  void *self_test_obj = this->entities_[::atlantic_v5::ENT_SELF_TEST_RESULT];
-  if (self_test_obj != nullptr && this->kinds_[::atlantic_v5::ENT_SELF_TEST_RESULT] == EntityKind::TEXT_SENSOR)
-    static_cast<text_sensor::TextSensor *>(self_test_obj)->publish_state(this->relay_task_->self_test_result());
 }
 
 void AtlanticV5Component::loop_mitm() {

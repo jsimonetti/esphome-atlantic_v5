@@ -49,7 +49,6 @@ CONF_BUS_CAPTURE = "bus_capture"
 CONF_TX_ENABLE_PIN = "tx_enable_pin"
 CONF_ONE_WIRE_MIRROR = "one_wire_mirror"
 CONF_RELAY_CORE = "relay_core"
-CONF_SELF_TEST = "self_test"
 CONF_FORWARD_BAD_CRC = "forward_bad_crc"
 CONF_FRAME_SILENCE = "frame_silence"
 CONF_ECHO_DRAIN = "echo_drain"
@@ -128,8 +127,8 @@ def _validate_sides(config):
         if CONF_TX_ENABLE_PIN not in config[CONF_HMI] and CONF_TX_ENABLE_PIN not in config[CONF_MAIN]:
             _LOGGER.warning(
                 "mode: mitm with neither side's tx_enable_pin set: transmission may not reach the "
-                "bus unless the transceiver can always drive it, or the bus is open-drain. Check "
-                "the self-test result once running (self_test: true, the default)."
+                "bus unless the transceiver can always drive it, or the bus is open-drain. Watch "
+                "the per-side frame counters once running."
             )
         return config
 
@@ -183,7 +182,6 @@ CONFIG_SCHEMA = cv.All(
             # No default here: absence (vs. an explicit value) is meaningful,
             # see to_code and _final_validate.
             cv.Optional(CONF_RELAY_CORE): cv.int_range(min=0, max=1),
-            cv.Optional(CONF_SELF_TEST, default=True): cv.boolean,
             # No schema default, like dir_setup/dir_hold: absence has to stay
             # distinguishable from an explicit False so mode: listener can
             # reject it rather than silently ignore it.
@@ -233,7 +231,6 @@ async def to_code(config):
         if relay_core is None:
             relay_core = -1 if get_esp32_variant() in SINGLE_CORE_VARIANTS else 1
         cg.add(var.set_relay_core(relay_core))
-        cg.add(var.set_self_test(config[CONF_SELF_TEST]))
         cg.add(var.set_forward_bad_crc(config.get(CONF_FORWARD_BAD_CRC, False)))
         return
 

@@ -4,25 +4,19 @@
 
 #include <cstring>
 
-#include "esphome/core/log.h"
-
 namespace atlantic_v5 {
 
 namespace {
 constexpr size_t EVENTS_QUEUE_LEN = 24;
-constexpr uint32_t LISTEN_WINDOW_US = 3'000'000;  // self-test listen window
 constexpr TickType_t RELAY_BLOCK_TICKS = pdMS_TO_TICKS(2);
 }  // namespace
-
-static const char *const TAG = "atlantic_v5.relay_task";
 
 RelayTask::RelayTask(const Config &cfg, RelayPolicy &policy)
     : hmi_io_(cfg.hmi),
       main_io_(cfg.main),
       relay_(hmi_io_, main_io_, policy, cfg.relay),
       policy_(policy),
-      relay_core_(cfg.relay_core),
-      self_test_enabled_(cfg.self_test) {
+      relay_core_(cfg.relay_core) {
   this->relay_.set_frame_sink(&RelayTask::frame_sink_trampoline, this);
 }
 
@@ -31,8 +25,6 @@ void RelayTask::begin() {
   this->main_io_.install();
 
   this->events_ = xQueueCreate(EVENTS_QUEUE_LEN, sizeof(FrameEvent));
-
-  this->run_self_test();  // never gates task startup
 
   // Set size must be >= the sum of both member queues' lengths (16 each, set in
   // UartBusIo::install()'s uart_driver_install call).
@@ -96,85 +88,6 @@ size_t RelayTask::drain_events(FrameEvent *out, size_t max_events) {
   while (n < max_events && xQueueReceive(this->events_, &out[n], 0) == pdTRUE)
     n++;
   return n;
-}
-
-void RelayTask::run_self_test() {
-  // Step 1: both sides already parked in RX by install(); confirm
-  // something is arriving on at least one side before deciding anything further.
-  uint32_t start_us = this->hmi_io_.now_us();
-  bool hmi_seen = false, main_seen = false;
-  // The self-test frames the listen window with its own short-lived
-  // assemblers, so they need the same configured backstop the relay uses.
-  const uint32_t silence_us = this->relay_.config().silence_us;
-  FrameAssembler hmi_asm(Channel::HMI, /*dual_bus=*/true, silence_us);
-  FrameAssembler main_asm(Channel::MAIN, /*dual_bus=*/true, silence_us);
-  uint8_t hmi_probe[MAX_FRAME]{};
-  uint8_t hmi_probe_len = 0;
-  uint8_t main_probe[MAX_FRAME]{};
-  uint8_t main_probe_len = 0;
-
-  while (this->hmi_io_.now_us() - start_us < LISTEN_WINDOW_US) {
-    uint8_t buf[MAX_FRAME];
-    uint32_t now_us = this->hmi_io_.now_us();
-    int n = this->hmi_io_.read(buf, sizeof(buf), 10000);
-    if (n > 0) {
-      hmi_seen = true;
-      for (int i = 0; i < n; i++) {
-        // Remember the first payload-less (harmless to repeat) completed frame.
-        if (hmi_asm.push(buf[i], now_us) && hmi_probe_len == 0 && hmi_asm.frame_len() == HEADER_LEN + 2) {
-          memcpy(hmi_probe, hmi_asm.frame(), hmi_asm.frame_len());
-          hmi_probe_len = hmi_asm.frame_len();
-        }
-      }
-    }
-    n = this->main_io_.read(buf, sizeof(buf), 0);
-    if (n > 0) {
-      main_seen = true;
-      for (int i = 0; i < n; i++) {
-        if (main_asm.push(buf[i], now_us) && main_probe_len == 0 && main_asm.frame_len() == HEADER_LEN + 2) {
-          memcpy(main_probe, main_asm.frame(), main_asm.frame_len());
-          main_probe_len = main_asm.frame_len();
-        }
-      }
-    }
-  }
-
-  if (!hmi_seen && !main_seen) {
-    snprintf(this->self_test_result_, sizeof(this->self_test_result_), "no traffic on either side (wiring/baud?)");
-    ESP_LOGE(TAG, "%s", this->self_test_result_);
-    return;
-  }
-
-  if (!this->self_test_enabled_) {
-    snprintf(this->self_test_result_, sizeof(this->self_test_result_), "traffic seen, probe skipped (self_test: false)");
-    ESP_LOGI(TAG, "%s", this->self_test_result_);
-    return;
-  }
-
-  // Step 2: transmit a repeat of an already-seen payload-less header and check
-  // whether it echoes back on that same side. Never forwarded
-  // through RelayPolicy/the opposite side — this is a probe, not relayed traffic.
-  bool hmi_can_drive = false, main_can_drive = false;
-  if (hmi_probe_len > 0) {
-    this->hmi_io_.flush_input();
-    this->hmi_io_.write(hmi_probe, hmi_probe_len);
-    uint8_t buf[MAX_FRAME];
-    int n = this->hmi_io_.read(buf, sizeof(buf), 5000);
-    hmi_can_drive = n > 0;
-  }
-  if (main_probe_len > 0) {
-    this->main_io_.flush_input();
-    this->main_io_.write(main_probe, main_probe_len);
-    uint8_t buf[MAX_FRAME];
-    int n = this->main_io_.read(buf, sizeof(buf), 5000);
-    main_can_drive = n > 0;
-  }
-
-  snprintf(this->self_test_result_, sizeof(this->self_test_result_),
-           "hmi: %s drive, %s traffic; main: %s drive, %s traffic",
-           hmi_can_drive ? "can" : (hmi_probe_len > 0 ? "cannot" : "not probed"), hmi_seen ? "seen" : "no",
-           main_can_drive ? "can" : (main_probe_len > 0 ? "cannot" : "not probed"), main_seen ? "seen" : "no");
-  ESP_LOGI(TAG, "self-test: %s", this->self_test_result_);
 }
 
 }  // namespace atlantic_v5

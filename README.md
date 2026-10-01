@@ -63,7 +63,6 @@ pinned FreeRTOS task, with an optional rewrite of one known frame (see
 atlantic_v5:
   id: dhw
   mode: mitm
-  self_test: true      # default; see "Startup self-test"
   hmi:
     uart_num: 1
     rx_pin: GPIO7
@@ -200,8 +199,8 @@ it would pull the bus low a second time, in parallel with the transistor stage
 and with different edge timing.
 
 `mode: mitm` logs a warning when neither side sets `tx_enable_pin`. On this
-revision that warning is expected; the [startup self-test](#startup-self-test)
-is what tells you whether transmission is actually reaching the bus.
+revision that warning is expected; see "Case B" below for how far you can tell
+whether transmission is actually reaching the bus.
 
 In `mode: listener`, declare one side with only `rx_pin`.
 
@@ -210,9 +209,8 @@ In `mode: listener`, declare one side with only `rx_pin`.
 If your hardware is neither of the above, the three behaviours below are
 selected independently per side, and can be combined. Not every board exposes
 a direction line; without one, `mode: mitm` may not be able to drive the bus
-at all, while `mode: listener` still works. The
-[startup self-test](#startup-self-test) is there to tell you which situation
-you are in.
+at all, while `mode: listener` still works. See "Case B" below for how far the
+per-side frame counters can tell you which situation you are in.
 
 #### Case A — DIR / TX-enable pin present
 
@@ -226,8 +224,16 @@ tunable — see "Bus timing" below.
 
 Omit `tx_enable_pin` entirely. The component writes straight to the UART TX
 line with no direction handling at all. This only works if your transceiver
-can always drive the bus (or the bus is genuinely open-drain) — the startup
-self-test (below) tells you whether that's actually true on your board.
+can always drive the bus (or the bus is genuinely open-drain).
+
+The per-side frame counters (see [Diagnostics](#diagnostics)) are what tell you
+whether it does, and they only tell you half of it. In `mitm`,
+`valid_frames_main` stuck at zero while `valid_frames_hmi` climbs means MAIN
+and this component are not reaching each other — a dead write path towards MAIN
+looks exactly like that, since MAIN only ever answers what it hears. The
+opposite direction is invisible to the counters: the HMI polls on its own, so
+`valid_frames_hmi` climbs whether or not what the component writes back reaches
+it. The symptom there is on the HMI's own display, not in a counter.
 
 #### Case C — one-wire mirror
 
@@ -301,23 +307,6 @@ atlantic_v5:
   mode: mitm
   forward_bad_crc: false   # default
 ```
-
-## Startup self-test
-
-`self_test: true` (the default) in `mode: mitm`. At boot, before relaying
-starts: the component listens for 3 seconds on both sides. If traffic was
-seen and `self_test` is enabled, it replays the first payload-less frame it
-saw on a side back onto that same side and checks whether the transceiver's
-own echo comes back — proof the TX path actually reaches the bus. The result
-is logged once and, if you add it, published to the `self_test_result`
-diagnostic text sensor (e.g. `"echo ok on both sides"`,
-`"no echo on hmi (check tx_enable_pin/wiring)"`,
-`"no traffic on either side (wiring/baud?)"`).
-
-The self-test result is diagnostic only and **never gates relaying** — a
-failed self-test still forwards frames exactly as received; it just means
-whatever rewrite you've asked for (see below) may not be reaching the bus
-electrically, even though the component believes it sent it.
 
 ## Control (MITM only): `select: control_mode`
 
@@ -408,7 +397,6 @@ text_sensor:
   - platform: atlantic_v5
     last_unknown_frame: {name: DHW last unknown frame}   # rate-limited, ~1/10s
     last_frame_dump: {name: DHW last frame dump}          # see raw_frame_dump below
-    self_test_result: {name: DHW self-test result}        # mitm-only
 
 binary_sensor:
   - platform: atlantic_v5
@@ -526,7 +514,6 @@ runs them:
 - Measured last-byte-in to first-byte-out latency, to confirm the < 1 ms
   (excluding transmit time) budget holds on real hardware, not just in the
   host-side mock-clock model.
-- The startup self-test's echo detection against a real transceiver.
 - The whole revision-2.0 wiring section. Those requirements come from reading
   that board's netlist and a known-good third-party relay; the only board this
   component has run on is revision 1.0.

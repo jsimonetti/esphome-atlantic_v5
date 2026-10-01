@@ -62,7 +62,6 @@ class AtlanticV5Component : public Component {
   void set_main_uart(int uart_num, int rx_pin, int tx_pin, int tx_enable_pin, bool one_wire_mirror,
                      uint32_t dir_setup_us, uint32_t dir_hold_us);
   void set_relay_core(int core) { relay_core_ = core; }
-  void set_self_test(bool enabled) { self_test_ = enabled; }
   void set_forward_bad_crc(bool enabled) { forward_bad_crc_ = enabled; }
 
   // Registers a read-only entity for EntityId id (catalog.h). obj must
@@ -129,7 +128,6 @@ class AtlanticV5Component : public Component {
   SideConfig hmi_cfg_;
   SideConfig main_cfg_;
   int relay_core_{1};
-  bool self_test_{true};
   bool forward_bad_crc_{false};
 
   ::atlantic_v5::RelayPolicy policy_;

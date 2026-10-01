@@ -87,7 +87,6 @@ class Relay {
   }
   const FrameAssembler::Stats &hmi_stats() const { return hmi_.asm_.stats(); }
   const FrameAssembler::Stats &main_stats() const { return main_.asm_.stats(); }
-  const Config &config() const { return cfg_; }
 
  private:
   struct Side {

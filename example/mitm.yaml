@@ -20,7 +20,6 @@ atlantic_v5:
   id: dhw
   mode: mitm
   bus_capture: true
-  self_test: true
   timeout: 60s
   # Bus timing (defaults shown; uncomment to tune on unfamiliar hardware).
   # frame_silence: 4000us
@@ -172,8 +171,6 @@ text_sensor:
       name: DHW last unknown frame
     last_frame_dump:
       name: DHW last frame dump
-    self_test_result:
-      name: DHW self-test result
 
 select:
   - platform: atlantic_v5
