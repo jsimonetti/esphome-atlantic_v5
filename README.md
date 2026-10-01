@@ -277,6 +277,31 @@ atlantic_v5:
     # ...
 ```
 
+## Bad-CRC forwarding: `forward_bad_crc`
+
+`mitm` only, default `false`, rejected in `mode: listener`.
+
+By default a frame whose CRC fails is counted in `crc_errors` and **not**
+relayed to the other side. A frame the far end is going to reject on CRC anyway
+cannot help it, and dropping it keeps a miswired, unterminated or electrically
+noisy input from being transmitted onto the opposite bus. On a disconnected
+board a floating RX line will otherwise assemble and relay several random frames
+per second — zero valid frames on a side alongside a climbing `crc_errors_*` and
+`frames_relayed` is the signature.
+
+Set it to `true` to relay bad-CRC frames anyway. That is worth trying if real
+traffic stops getting through and you suspect this component's framing, rather
+than the sender, is what the CRC is failing over — `frame_silence` closing long
+frames early is the usual cause. The rewrite hook never touches a bad-CRC frame
+either way, so it goes out exactly as received.
+
+```yaml
+atlantic_v5:
+  id: dhw
+  mode: mitm
+  forward_bad_crc: false   # default
+```
+
 ## Startup self-test
 
 `self_test: true` (the default) in `mode: mitm`. At boot, before relaying

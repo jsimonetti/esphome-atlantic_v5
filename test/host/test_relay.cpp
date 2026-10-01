@@ -276,43 +276,67 @@ int main() {
     CHECK(relay.stats().frames_relayed == frames_relayed_before);  // untouched
   }
 
-  // --- Fail-safe forwarding: a frame with a bad CRC is
-  // still forwarded raw and unmodified — the rewrite hook must never touch it,
-  // and the error is counted, not silently dropped. ---
+  // --- CRC gate: a frame with a bad CRC is counted but not forwarded by default,
+  // and forwarded raw and unmodified under forward_bad_crc — where the rewrite
+  // hook must still never touch it. ---
   {
     auto rows = load_capture(std::string(CAPTURES_DIR) + "/synthetic_dual_bus_basic.csv");
     // Corrupt one payload byte of the MAIN response to 0164FEB006 (row 1), breaking its CRC.
+    std::vector<uint8_t> corrupted;
     for (auto &row : rows) {
       if (row.channel == Channel::MAIN && row.bytes.size() > 6 && row.bytes[0] == 0x01 && row.bytes[2] == 0xFE &&
           row.bytes[3] == 0xB0) {
         row.bytes[6] ^= 0xFF;
+        corrupted = row.bytes;
         break;
       }
     }
+    CHECK(!corrupted.empty());
 
-    MockBusIo hmi_io, main_io;
-    RelayPolicy policy;
-    policy.set_control_mode(atlantic_v5::ControlMode::BOOST);  // even active, must not touch this header
-    Relay relay(hmi_io, main_io, policy);
-
-    for (const auto &row : rows) {
-      (row.channel == Channel::HMI ? hmi_io : main_io).queue(row.t_us, row.bytes);
-      hmi_io.set_now(row.t_us);
-      main_io.set_now(row.t_us);
-      relay.poll(row.t_us);
-    }
-
-    CHECK(relay.main_stats().crc_errors == 1);
-    bool found_corrupted = false;
-    for (const auto &row : rows) {
-      if (row.channel != Channel::MAIN)
-        continue;
-      for (const auto &w : hmi_io.writes_) {
-        if (w == row.bytes)
-          found_corrupted = true;
+    auto replay = [&rows](Relay &relay, MockBusIo &hmi_io, MockBusIo &main_io) {
+      for (const auto &row : rows) {
+        (row.channel == Channel::HMI ? hmi_io : main_io).queue(row.t_us, row.bytes);
+        hmi_io.set_now(row.t_us);
+        main_io.set_now(row.t_us);
+        relay.poll(row.t_us);
       }
+    };
+    auto hmi_saw = [&corrupted](const MockBusIo &hmi_io) {
+      for (const auto &w : hmi_io.writes_) {
+        if (w == corrupted)
+          return true;
+      }
+      return false;
+    };
+
+    {
+      MockBusIo hmi_io, main_io;
+      RelayPolicy policy;
+      policy.set_control_mode(atlantic_v5::ControlMode::BOOST);
+      Relay relay(hmi_io, main_io, policy);  // default: forward_bad_crc off
+
+      replay(relay, hmi_io, main_io);
+
+      CHECK(relay.main_stats().crc_errors == 1);
+      CHECK(!hmi_saw(hmi_io));
+      // Every other MAIN frame still relayed, so the gate is per frame, not a stall.
+      CHECK(relay.main_stats().frames > 1);
+      CHECK(relay.stats().frames_relayed == relay.hmi_stats().frames + relay.main_stats().frames - 1);
     }
-    CHECK(found_corrupted);
+
+    {
+      MockBusIo hmi_io, main_io;
+      RelayPolicy policy;
+      policy.set_control_mode(atlantic_v5::ControlMode::BOOST);  // even active, must not touch this header
+      Relay relay(hmi_io, main_io, policy,
+                  Relay::Config{/*silence_us=*/4000, /*echo_drain_us=*/200, /*forward_bad_crc=*/true});
+
+      replay(relay, hmi_io, main_io);
+
+      CHECK(relay.main_stats().crc_errors == 1);
+      CHECK(hmi_saw(hmi_io));
+      CHECK(relay.stats().frames_relayed == relay.hmi_stats().frames + relay.main_stats().frames);
+    }
   }
 
   // --- Echo accounting: bytes arriving on a side within

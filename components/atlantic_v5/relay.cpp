@@ -41,15 +41,21 @@ void Relay::service(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
 
 void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   Frame f(in_channel, in.asm_.frame(), in.asm_.frame_len());
+
+  // Dropped before the frame sink too: loop_mitm() already refuses to decode a
+  // bad-CRC frame, so enqueueing one only costs event-queue space.
+  if (!cfg_.forward_bad_crc && !f.crc_valid())
+    return;
+
   // Snapshot the payload before the rewrite: the wire gets the rewritten frame,
   // the decoder gets what the appliance actually reported (ADR 0002).
   uint8_t observed[REWRITE_PAYLOAD_LEN] = {};
   if (f.payload_len() == REWRITE_PAYLOAD_LEN && f.buffered_payload_len() >= REWRITE_PAYLOAD_LEN)
     std::memcpy(observed, f.payload(), REWRITE_PAYLOAD_LEN);
 
-  // apply() is itself a no-op on a bad-CRC or non-matching frame, which gives us
-  // the fail-safe forwarding rule for free: forward first,
-  // exactly as received unless the rewrite hook says otherwise.
+  // apply() is itself a no-op on a bad-CRC or non-matching frame, so a frame that
+  // only got this far because forward_bad_crc is set still goes out exactly as
+  // received.
   bool rewritten = policy_.apply(f);
   out.io.write(f.raw(), f.raw_len());
   out.io.flush_input();

@@ -152,6 +152,7 @@ void AtlanticV5Component::setup_mitm() {
   cfg.main = main_io_cfg;
   cfg.relay.silence_us = this->frame_silence_us_;
   cfg.relay.echo_drain_us = this->echo_drain_us_;
+  cfg.relay.forward_bad_crc = this->forward_bad_crc_;
   cfg.relay_core = this->relay_core_;
   cfg.self_test = this->self_test_;
 
@@ -177,7 +178,7 @@ void AtlanticV5Component::loop_mitm() {
   for (size_t i = 0; i < n; i++) {
     const auto &ev = events[i];
     if (!ev.crc_ok)
-      continue;  // still forwarded on the wire (fail-safe); just not decoded
+      continue;  // only reaches here at all under forward_bad_crc; never decoded
     ::atlantic_v5::Frame f(ev.channel, ev.data, ev.len);
     // Transaction-byte rule: only MAIN's payload-bearing response
     // resets the staleness gate, matching listener mode's semantics.

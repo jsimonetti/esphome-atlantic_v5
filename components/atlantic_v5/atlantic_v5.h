@@ -63,6 +63,7 @@ class AtlanticV5Component : public Component {
                      uint32_t dir_setup_us, uint32_t dir_hold_us);
   void set_relay_core(int core) { relay_core_ = core; }
   void set_self_test(bool enabled) { self_test_ = enabled; }
+  void set_forward_bad_crc(bool enabled) { forward_bad_crc_ = enabled; }
 
   // Registers a read-only entity for EntityId id (catalog.h). obj must
   // outlive this component; kind selects which publish_state overload to call.
@@ -129,6 +130,7 @@ class AtlanticV5Component : public Component {
   SideConfig main_cfg_;
   int relay_core_{1};
   bool self_test_{true};
+  bool forward_bad_crc_{false};
 
   ::atlantic_v5::RelayPolicy policy_;
   ::atlantic_v5::RelayTask *relay_task_{nullptr};

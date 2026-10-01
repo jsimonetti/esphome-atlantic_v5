@@ -50,6 +50,7 @@ CONF_TX_ENABLE_PIN = "tx_enable_pin"
 CONF_ONE_WIRE_MIRROR = "one_wire_mirror"
 CONF_RELAY_CORE = "relay_core"
 CONF_SELF_TEST = "self_test"
+CONF_FORWARD_BAD_CRC = "forward_bad_crc"
 CONF_FRAME_SILENCE = "frame_silence"
 CONF_ECHO_DRAIN = "echo_drain"
 CONF_DIR_SETUP = "dir_setup"
@@ -149,6 +150,11 @@ def _validate_sides(config):
     for key in (CONF_DIR_SETUP, CONF_DIR_HOLD):
         if key in config[side_key]:
             raise cv.Invalid(f"'{key}' only applies in mode: mitm", path=[side_key, key])
+    # Same reasoning, one level up: listener never forwards anything.
+    if CONF_FORWARD_BAD_CRC in config:
+        raise cv.Invalid(
+            f"'{CONF_FORWARD_BAD_CRC}' only applies in mode: mitm", path=[CONF_FORWARD_BAD_CRC]
+        )
     return config
 
 
@@ -178,6 +184,10 @@ CONFIG_SCHEMA = cv.All(
             # see to_code and _final_validate.
             cv.Optional(CONF_RELAY_CORE): cv.int_range(min=0, max=1),
             cv.Optional(CONF_SELF_TEST, default=True): cv.boolean,
+            # No schema default, like dir_setup/dir_hold: absence has to stay
+            # distinguishable from an explicit False so mode: listener can
+            # reject it rather than silently ignore it.
+            cv.Optional(CONF_FORWARD_BAD_CRC): cv.boolean,
             # frame_silence must be non-zero: at zero the backstop
             # fires on every tick and no frame ever assembles.
             cv.Optional(CONF_FRAME_SILENCE, default=f"{DEFAULT_FRAME_SILENCE_US}us"): cv.All(
@@ -224,6 +234,7 @@ async def to_code(config):
             relay_core = -1 if get_esp32_variant() in SINGLE_CORE_VARIANTS else 1
         cg.add(var.set_relay_core(relay_core))
         cg.add(var.set_self_test(config[CONF_SELF_TEST]))
+        cg.add(var.set_forward_bad_crc(config.get(CONF_FORWARD_BAD_CRC, False)))
         return
 
     side = config.get(CONF_HMI, config.get(CONF_MAIN))
