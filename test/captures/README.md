@@ -48,6 +48,15 @@ headers — firmware version, serial number, power board version, controller
 model, HMI model and setpoint — are absent, as is anything that only happens
 during an activation.
 
+`real_dual_bus_idle_polling.csv` is the same appliance in the same standby
+state, but captured in `mitm` mode with the ESP cut into the wire, so each row
+carries the side that sent it: 11.63 s, 649 chunks (324 `hmi`, 325 `main`), 13
+polling rounds, zero CRC errors. Its decoded header set is **identical** to
+`real_single_bus_idle_polling`'s, so it adds no decoder coverage; what it adds
+is the only real-bytes golden over `replay_dual_bus` and the per-side framing
+path, which until now had nothing but `synthetic_dual_bus_basic.csv` (never
+freezable). It likewise has no init burst and so nothing to anonymise.
+
 ## Recording your own capture
 
 Set `bus_capture: true` on the `atlantic_v5:` hub, flash a devkit tapped onto
@@ -57,6 +66,10 @@ the bus in listener mode, and pipe the logs through the converter:
 uv run esphome logs example/listener.yaml \
   | python3 test/host/esphome_log_to_capture.py -o test/captures/my_capture.csv
 ```
+
+In `mitm` mode the same applies, but the device tags each chunk `hmi` or `main`
+instead of `bus`, and the converter keeps the two apart. Replay such a capture
+with `--mode mitm`.
 
 The device logs `BUSCAP,<t_us>,<channel>,<hex>` under the
 `atlantic_v5.bus_capture` tag at `INFO` level; ESPHome always prepends its own
