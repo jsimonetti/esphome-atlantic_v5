@@ -114,6 +114,16 @@ def _validate_sides(config):
         for key in (CONF_HMI, CONF_MAIN):
             if CONF_TX_PIN not in config[key]:
                 raise cv.Invalid(f"'{key}: tx_pin' is required in mode: mitm", path=[key])
+            # The mirror drives the RX pin during transmit and parks both pins as
+            # inputs otherwise, which is only coherent if something switches the
+            # transceiver's direction. With no DIR line it is parked in receive and
+            # driving those pins back, so the mirror would contend with it.
+            if config[key][CONF_ONE_WIRE_MIRROR] and CONF_TX_ENABLE_PIN not in config[key]:
+                raise cv.Invalid(
+                    "'one_wire_mirror' requires 'tx_enable_pin' on the same side; no known "
+                    "board wants the mirror without a direction pin",
+                    path=[key, CONF_ONE_WIRE_MIRROR],
+                )
         if CONF_TX_ENABLE_PIN not in config[CONF_HMI] and CONF_TX_ENABLE_PIN not in config[CONF_MAIN]:
             _LOGGER.warning(
                 "mode: mitm with neither side's tx_enable_pin set: transmission may not reach the "

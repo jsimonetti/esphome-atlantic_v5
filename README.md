@@ -234,10 +234,13 @@ self-test (below) tells you whether that's actually true on your board.
 Some transceiver boards pair both of a side's channels onto the *same* physical
 bus wire, so during transmit the TX signal has to appear on both the TX and RX
 pins, and during receive neither pin may be driven by the UART. Set
-`one_wire_mirror: true` on that side to enable it; combine with `tx_enable_pin`
-if the board also has a DIR line to assert around the transmit window. Leave it
-off unless you know your board is wired this way — it drives the RX pin, which
-on other topologies means fighting whatever is already driving it.
+`one_wire_mirror: true` on that side to enable it.
+
+It must be combined with `tx_enable_pin`, and is rejected without one: the
+mirror only makes sense when something switches the transceiver's direction. A
+board with no direction line is parked in receive and is driving those pins
+itself, so the mirror would contend with it. Leave the mirror off unless you
+know your board pairs its channels this way.
 
 ## Bus timing
 
