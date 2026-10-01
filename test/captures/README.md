@@ -43,8 +43,9 @@ and `bool` codecs on real bytes. A sample of each was decoded by hand from
 [`docs/protocol.md`](../../docs/protocol.md) and compared to the replay output
 before the golden was frozen (the frame-by-frame working is in ticket 02), and
 every length and idle payload in that document's *Unmapped messages* table that
-occurs here matched it. The session has no init burst, so `text`, `u16` and
-`u32` are still unproven on real hardware, and so is anything that only happens
+occurs here matched it. The session has no init burst, so the six init-only
+headers — firmware version, serial number, power board version, controller
+model, HMI model and setpoint — are absent, as is anything that only happens
 during an activation.
 
 ## Recording your own capture
