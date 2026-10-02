@@ -5,10 +5,34 @@ serial bus between the HMI control panel and the MAIN controller board of an
 Atlantic/Thermor "V5" domestic hot water heat pump (Explorer V5 class units,
 believed to also apply to equivalent OEM-rebadged V5 units).
 
+**Built for [AquaMQTT](https://github.com/tspopp/AquaMQTT) hardware.** There is
+no board specific to this component. An AquaMQTT interface board is what it
+expects to be wired to, see ["Boards"](#boards) for the wiring.
+
 Full protocol knowledge lives in [`docs/protocol.md`](docs/protocol.md) (the
 authoritative wire-format spec) and the domain vocabulary in
 [`CONTEXT.md`](CONTEXT.md). This README is the user-facing companion: install,
 wire it up, know its limits.
+
+## Prior art and credits
+
+This component exists because of work done elsewhere first:
+
+- **[AquaMQTT](https://github.com/tspopp/AquaMQTT)** by
+  [@tspopp](https://github.com/tspopp) and contributors — the original
+  MQTT bridge for Groupe Atlantic DHW heat pumps, and the source of the
+  hardware this component runs on (see "Boards" below). Apache-2.0.
+- **[AquaMQTT PR #127, "Support V5 protocol"](https://github.com/tspopp/AquaMQTT/pull/127)**
+  by [@wowtor](https://github.com/wowtor) — the first working V5
+  implementation, developed against real Explorer V5 hardware, together with
+  its own protocol notes. Every field description in
+  [`docs/protocol.md`](docs/protocol.md) was cross-checked against it. That PR
+  is also where the idea of an ESPHome port was raised, by its participants.
+
+This is an independent implementation, not a fork or a port: the decode,
+framing, relay and entity code here was written against the ESPHome component
+model from scratch. What it took from the above is protocol knowledge,
+hardware, and the confidence that MITM on this bus works at all.
 
 ## Status
 
@@ -97,20 +121,26 @@ wiring variation this component has to be told about.
 
 ### Boards
 
-There is no board specific to this component. The electrical problem is
-identical to the one [AquaMQTT](https://github.com/tspopp/AquaMQTT) solves for
-the older (V3/V4) Groupe Atlantic protocols, and its hardware works here
-unchanged — the V5 protocol differs, the wiring does not. See
+The electrical problem is identical to the one
+[AquaMQTT](https://github.com/tspopp/AquaMQTT) solves for the older (V3/V4)
+Groupe Atlantic protocols, which is why its hardware works here unchanged —
+the V5 protocol differs, the wiring does not. See
 [AquaMQTT's `pcb/` directory](https://github.com/tspopp/AquaMQTT/tree/main/pcb)
 for the board designs and
 [its `WIRING.md`](https://github.com/tspopp/AquaMQTT/blob/main/WIRING.md) for
 how to get at the HMI–MAIN link inside the unit.
 
-Both published revisions work. They need different settings, because they solve
-the level-shifting problem in different ways: revision 2.0 uses a pair of
+The two published revisions need different settings, because they solve the
+level-shifting problem in different ways: revision 2.0 uses a pair of
 direction-controlled transceivers, revision 1.0 a level converter with
 open-collector transistor drivers. Pick the section below that matches your
-board. Both revisions have been run in `mode: mitm` on real hardware.
+board.
+
+Revision 2.0 is the only board this component has been run on, and it has been
+run in both modes — `mode: listener` for the `real_*` captures under
+`test/captures/`, and `mode: mitm` inline on a live appliance. The revision-1.0
+settings below are read off that revision's design and have never been
+exercised here.
 
 The data pins are the same on both revisions; only revision 2.0 adds the two
 direction pins:
@@ -174,6 +204,10 @@ rejected there: listener never drives the bus, so the UART's TX output has no
 business being attached to a pin that the transceiver may be driving.
 
 #### Revision 1.0 — level converter with open-collector drivers
+
+**Untested.** Nobody on this project has run this revision, in either mode.
+What follows is derived from the board design, not from use — treat it as a
+starting point rather than a known-good configuration.
 
 ```yaml
   hmi:
@@ -525,6 +559,10 @@ live bus, and remain open until someone runs them:
   wire time for a 25-byte frame at 38400 8N1) and does not answer this on its
   own. Reading it as if it excluded transmit time is how an earlier
   investigation convinced itself frames were being truncated; they were not.
+- **The revision-1.0 board, at all.** Every hardware session so far has used a
+  revision-2.0 board. Its revision-1.0 counterpart differs in exactly the area
+  nothing else here can check — how the transmit path reaches the wire — so
+  neither its wiring section nor Case B has been confirmed against a board.
 
 ## Building and testing
 
@@ -543,29 +581,6 @@ The host test suite (`test_crc`, `test_assembler`, `test_decoder`,
 toolchain at all — it's the primary verification mechanism for the decode and
 relay logic, which is deliberately written to compile on a host with no ESP or
 ESPHome headers so it can be tested without hardware.
-
-## Prior art and credits
-
-This component exists because of work done elsewhere first:
-
-- **[AquaMQTT](https://github.com/tspopp/AquaMQTT)** by
-  [@tspopp](https://github.com/tspopp) and contributors — the original
-  MQTT bridge for Groupe Atlantic DHW heat pumps, and the source of the
-  hardware this component runs on (see "Boards" above). Apache-2.0.
-- **[AquaMQTT PR #127, "Support V5 protocol"](https://github.com/tspopp/AquaMQTT/pull/127)**
-  by [@wowtor](https://github.com/wowtor) — the first working V5
-  implementation, developed against real Explorer V5 hardware, together with
-  its own protocol notes. Every field description in
-  [`docs/protocol.md`](docs/protocol.md) was cross-checked against it. That PR
-  is also where the idea of an ESPHome port was raised, by its participants.
-- Bus data contributed by third parties in AquaMQTT issue threads, used as
-  reference captures under `test/captures/external_*.csv`; each file records
-  its own source, author and date.
-
-This is an independent implementation, not a fork or a port: the decode,
-framing, relay and entity code here was written against the ESPHome component
-model from scratch. What it took from the above is protocol knowledge,
-hardware, and the confidence that MITM on this bus works at all.
 
 ## License
 
