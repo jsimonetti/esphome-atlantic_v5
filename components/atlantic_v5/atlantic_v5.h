@@ -35,8 +35,8 @@ enum class Mode : uint8_t { LISTENER, MITM };
 
 // Which ESPHome platform an entities_[] slot holds. Only
 // read-only entities register through this generic path (ADR 0001); the
-// control_mode select and log_raw_frames switch are controllable and get
-// their own dedicated classes (atlantic_v5_select.h, atlantic_v5_switch.h).
+// control_mode select is controllable and gets its own dedicated class
+// (atlantic_v5_select.h).
 enum class EntityKind : uint8_t { SENSOR, BINARY_SENSOR, TEXT_SENSOR };
 
 class AtlanticV5Component : public Component {
@@ -72,9 +72,13 @@ class AtlanticV5Component : public Component {
   // mode - unreachable anyway, since select.py rejects control_mode there.
   void set_control_mode(::atlantic_v5::ControlMode mode);
 
-  // The log_raw_frames switch's write path: gates whether
-  // already-framed, CRC-valid frames get hex-logged at DEBUG level.
-  void set_log_raw_frames(bool enabled) { this->log_raw_frames_ = enabled; }
+  // Frame capture: one gate per catalogue category, each logging
+  // CRC-valid frames under its own tag.
+  void set_frame_capture(bool mapped, bool unmapped, bool unknown) {
+    this->capture_mapped_ = mapped;
+    this->capture_unmapped_ = unmapped;
+    this->capture_unknown_ = unknown;
+  }
 
   void setup() override;
   void loop() override;
@@ -108,11 +112,11 @@ class AtlanticV5Component : public Component {
   void publish_diag_uint(uint16_t id, uint32_t value);
   void publish_diag_float(uint16_t id, float value);
 
-  // log_raw_frames: fired for every already-framed, CRC-valid frame
+  // Frame capture: fired for every already-framed, CRC-valid frame
   // in both modes - directly from loop_mitm()'s decoded FrameEvents, and via
-  // Listener::FrameSink in listener mode (frame_log_trampoline).
-  void maybe_log_frame(const ::atlantic_v5::Frame &f);
-  static void frame_log_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
+  // Listener::FrameSink in listener mode (frame_capture_trampoline).
+  void maybe_capture_frame(const ::atlantic_v5::Frame &f);
+  static void frame_capture_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
 
   // Per-side MITM config; unused in listener mode.
   struct SideConfig {
@@ -146,7 +150,9 @@ class AtlanticV5Component : public Component {
 #endif
   Mode mode_{Mode::LISTENER};
   bool bus_capture_{false};
-  bool log_raw_frames_{false};
+  bool capture_mapped_{false};
+  bool capture_unmapped_{false};
+  bool capture_unknown_{false};
   int uart_num_{1};
   int rx_pin_{-1};
   uint32_t timeout_us_{60'000'000};  // default 60s

@@ -21,6 +21,10 @@ atlantic_v5:
   mode: mitm
   capture:
     bus: true
+    # Post-CRC frame capture, one tag per catalogue category.
+    mapped: false
+    unmapped: false
+    unknown: false
   timeout: 60s
   # Bus timing (defaults shown; uncomment to tune on unfamiliar hardware).
   # frame_silence: 4000us
@@ -166,8 +170,3 @@ select:
   - platform: atlantic_v5
     control_mode:
       name: DHW operation mode
-
-switch:
-  - platform: atlantic_v5
-    log_raw_frames:
-      name: DHW log raw frames

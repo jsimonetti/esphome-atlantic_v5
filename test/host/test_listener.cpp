@@ -120,7 +120,7 @@ int main() {
     CHECK(l.assembler_stats().silence_closes == 1);
   }
 
-  // --- set_frame_sink (behind log_raw_frames): fired once per complete,
+  // --- set_frame_sink (behind frame capture): fired once per complete,
   // CRC-valid frame with the frame itself, independent of whether the header
   // is in Decoder's catalogue - never fired for a bad-CRC frame. ---
   {

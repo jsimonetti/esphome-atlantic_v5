@@ -22,7 +22,7 @@ class Listener {
     ctx_ = ctx;
   }
 
-  // Raw already-framed, CRC-valid frame hook (feeds log_raw_frames),
+  // Raw already-framed, CRC-valid frame hook (feeds frame capture),
   // fired for every complete frame regardless of whether Decoder recognises
   // its header - mirrors Relay::FrameSink so both modes share the
   // same "who gets to see a completed frame" shape.

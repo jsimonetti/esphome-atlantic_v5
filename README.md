@@ -390,10 +390,6 @@ sensor:
 binary_sensor:
   - platform: atlantic_v5
     connected: {name: DHW connected}
-
-switch:
-  - platform: atlantic_v5
-    log_raw_frames: {name: DHW log raw frames}
 ```
 
 `connected` reports whether the appliance is still talking, in both modes. It
@@ -434,24 +430,56 @@ decoded). Headers in the catalogue's *Unmapped messages* table are known,
 routine traffic with no established meaning; they are not counted here and
 are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
 
-### `log_raw_frames` vs `capture.bus`
+## Capture
 
-These solve two different problems and are easy to confuse:
+Four independent debug streams, all off by default, all logged at `DEBUG`
+level under their own logger tag:
 
-- **Bus capture** (`atlantic_v5: { capture: { bus: true } }`) is raw,
-  *pre-assembly* byte+timestamp logging, meant for harvesting
-  `test/captures/*.csv` fixtures from your own hardware. It logs
-  `BUSCAP,<t_us>,<channel>,<hex>` lines at `DEBUG` level under the
-  `atlantic_v5.capture.bus` logger tag — see `test/captures/README.md` for the
+```yaml
+atlantic_v5:
+  capture:
+    bus: false        # raw bytes, pre-assembly
+    mapped: false     # CRC-valid frames whose header has a known meaning
+    unmapped: false   # CRC-valid frames whose header is known but meaningless
+    unknown: false    # CRC-valid frames whose header isn't in the catalogue
+```
+
+The booleans are the gate and the tags are the filter. A category that is off
+costs one branch per frame — nothing is formatted and no catalogue lookup
+happens — so leaving them off on a live bus is free. On a running device you
+can silence or restore one stream with the logger's `logger.set_level` action
+without a reflash.
+
+`bus` and the other three solve two different problems and are easy to
+confuse:
+
+- **Bus capture** (`capture: { bus: true }`) is raw, *pre-assembly*
+  byte+timestamp logging, meant for harvesting `test/captures/*.csv` fixtures
+  from your own hardware. It logs `BUSCAP,<t_us>,<channel>,<hex>` lines under
+  the `atlantic_v5.capture.bus` tag — see `test/captures/README.md` for the
   converter script that turns those log lines into a canonical capture file.
-- **`log_raw_frames`** (the switch above) is post-assembly, post-CRC-check hex
-  logging of already-framed frames, for live debugging of a specific header
-  you're trying to understand. It writes a `frame <channel> <hex>` line at
-  `DEBUG` level under the `atlantic_v5` logger tag and publishes no entity, so
-  it costs nothing in Home Assistant state churn. Every CRC-valid frame is
-  logged while the switch is on, which on a live bus is a lot — leave it off
-  unless you are watching. It says nothing about framing/CRC health, either;
-  that's what the counters above are for.
+- **Frame capture** (`mapped`, `unmapped`, `unknown`) is post-assembly,
+  post-CRC-check hex logging of already-framed frames, for live debugging of a
+  specific header you're trying to understand. Each category logs
+  `<channel> <hex>` — the whole frame, header through CRC — under
+  `atlantic_v5.capture.mapped`, `.unmapped` or `.unknown`, and publishes no
+  entity, so it costs nothing in Home Assistant state churn.
+
+Splitting frame capture by category is the point: `unknown: true` alone shows
+you traffic this component has never seen, without the routine polling chatter
+that `mapped: true` would bury it under.
+
+A frame is classified by its header key alone. A mapped frame the decoder then
+rejects — a payload shorter than the catalogue says — still logs as `mapped`:
+the capture log says what the frame *is*, the diagnostic counters say what
+happened to it. There is no category for CRC-failed frames; those are covered
+by the CRC error counters and by `bus`.
+
+In `mitm`, a rewritten frame is captured as it went out on the wire, not as
+the input entities report it (which is the observed input — see ADR 0002).
+
+Nothing is throttled, so on a live bus `mapped: true` is a lot of output.
+Leave it off unless you are watching.
 
 ## Open protocol questions
 

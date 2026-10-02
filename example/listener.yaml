@@ -21,6 +21,10 @@ atlantic_v5:
   mode: listener
   capture:
     bus: true
+    # Post-CRC frame capture, one tag per catalogue category.
+    mapped: false
+    unmapped: false
+    unknown: false
   timeout: 60s
   hmi:
     uart_num: 1
@@ -126,8 +130,3 @@ text_sensor:
       name: DHW HMI version
     hmi_model:
       name: DHW HMI model
-
-switch:
-  - platform: atlantic_v5
-    log_raw_frames:
-      name: DHW log raw frames

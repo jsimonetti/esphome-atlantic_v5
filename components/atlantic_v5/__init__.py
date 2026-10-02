@@ -47,6 +47,9 @@ CONF_MAIN = "main"
 CONF_UART_NUM = "uart_num"
 CONF_CAPTURE = "capture"
 CONF_BUS = "bus"
+CONF_MAPPED = "mapped"
+CONF_UNMAPPED = "unmapped"
+CONF_UNKNOWN = "unknown"
 CONF_TX_ENABLE_PIN = "tx_enable_pin"
 CONF_ONE_WIRE_MIRROR = "one_wire_mirror"
 CONF_RELAY_CORE = "relay_core"
@@ -101,6 +104,9 @@ SIDE_SCHEMA = cv.Schema(
 CAPTURE_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_BUS, default=False): cv.boolean,
+        cv.Optional(CONF_MAPPED, default=False): cv.boolean,
+        cv.Optional(CONF_UNMAPPED, default=False): cv.boolean,
+        cv.Optional(CONF_UNKNOWN, default=False): cv.boolean,
     }
 )
 
@@ -208,7 +214,13 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_mode(config[CONF_MODE]))
-    cg.add(var.set_bus_capture(config[CONF_CAPTURE][CONF_BUS]))
+    capture = config[CONF_CAPTURE]
+    cg.add(var.set_bus_capture(capture[CONF_BUS]))
+    cg.add(
+        var.set_frame_capture(
+            capture[CONF_MAPPED], capture[CONF_UNMAPPED], capture[CONF_UNKNOWN]
+        )
+    )
     cg.add(var.set_timeout(config[CONF_TIMEOUT]))
     cg.add(var.set_frame_silence(config[CONF_FRAME_SILENCE]))
 

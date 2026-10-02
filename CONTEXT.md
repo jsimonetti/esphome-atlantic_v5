@@ -15,6 +15,10 @@ _Avoid_: frame OK, good frame
 **Header key**:
 The first 5 bytes of a Frame as a big-endian `uint64_t`; the dispatch key used for decoding and for matching the rewrite target.
 
+**Mapped frame**:
+A Frame whose header key appears in the message catalogue with an established meaning, so entities are derived from it. The bulk of routine traffic.
+_Avoid_: known frame, decoded frame (a mapped frame the decoder then rejects is still mapped)
+
 **Unmapped frame**:
 A Frame whose header key appears in the message catalogue but has no established meaning, so no entity is derived from it. Expected, routine traffic.
 _Avoid_: unknown frame
@@ -68,5 +72,6 @@ The I1/I2 values MAIN actually acts on — equal to the observed input under pas
 Raw, pre-assembly byte+timestamp logging, used to harvest real `test/captures/*.csv` files from a user's own hardware. Runs upstream of the FrameAssembler; needs no decode logic.
 _Avoid_: raw frame dump, capture log
 
-**Frame log** (`log_raw_frames`):
-Post-assembly, post-CRC-check hex logging of already-framed frames to the ESPHome log, for live debugging. Publishes no entity. Distinct from bus capture, which is pre-assembly and produces test fixtures, not debug output.
+**Frame capture** (`capture: { mapped|unmapped|unknown: true }`):
+Post-assembly, post-CRC-check hex logging of already-framed frames to the ESPHome log, for live debugging. Gated per catalogue category, each category under its own `atlantic_v5.capture.<category>` tag. Publishes no entity. Distinct from bus capture, which is pre-assembly and produces test fixtures, not debug output.
+_Avoid_: frame log, raw frame log

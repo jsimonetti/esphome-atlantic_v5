@@ -14,6 +14,12 @@ namespace atlantic_v5_component {
 
 static const char *const TAG = "atlantic_v5";
 
+// One tag per frame-capture category, so a running device can re-gate a single
+// stream with the logger's set-level action. Spelled like the config keys.
+static const char *const CAPTURE_MAPPED_TAG = "atlantic_v5.capture.mapped";
+static const char *const CAPTURE_UNMAPPED_TAG = "atlantic_v5.capture.unmapped";
+static const char *const CAPTURE_UNKNOWN_TAG = "atlantic_v5.capture.unknown";
+
 namespace {
 // Uppercase hex, no separators - matches bus_capture_logger.cpp's own copy;
 // kept separate rather than shared since the two live in different namespaces
@@ -90,7 +96,7 @@ void AtlanticV5Component::setup_listener() {
 
   this->listener_.set_silence_us(this->frame_silence_us_);
   this->listener_.set_sink(&AtlanticV5Component::publish_trampoline, this);
-  this->listener_.set_frame_sink(&AtlanticV5Component::frame_log_trampoline, this);
+  this->listener_.set_frame_sink(&AtlanticV5Component::frame_capture_trampoline, this);
 }
 
 void AtlanticV5Component::loop_listener() {
@@ -179,9 +185,9 @@ void AtlanticV5Component::loop_mitm() {
       this->last_main_us_ = ev.t_us;
       this->seen_main_ = true;
     }
-    // Log before restoring: log_raw_frames exists to show what went out on the
-    // wire, which is the rewritten frame.
-    this->maybe_log_frame(f);
+    // Capture before restoring: frame capture exists to show what went out on
+    // the wire, which is the rewritten frame.
+    this->maybe_capture_frame(f);
     // ADR 0002: the input entities report the observed input, so put the
     // pre-rewrite payload back before decoding.
     if (ev.modified)
@@ -265,18 +271,38 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
     this->relay_task_->reset_latency_stats();
 }
 
-void AtlanticV5Component::maybe_log_frame(const ::atlantic_v5::Frame &f) {
-  if (!this->log_raw_frames_)
+void AtlanticV5Component::maybe_capture_frame(const ::atlantic_v5::Frame &f) {
+  // Checked before classifying so that all-off costs one branch per frame.
+  if (!this->capture_mapped_ && !this->capture_unmapped_ && !this->capture_unknown_)
     return;
+
+  const char *tag;
+  switch (::atlantic_v5::classify_header(f.header_key())) {
+    case ::atlantic_v5::HeaderClass::MAPPED:
+      if (!this->capture_mapped_)
+        return;
+      tag = CAPTURE_MAPPED_TAG;
+      break;
+    case ::atlantic_v5::HeaderClass::UNMAPPED:
+      if (!this->capture_unmapped_)
+        return;
+      tag = CAPTURE_UNMAPPED_TAG;
+      break;
+    default:
+      if (!this->capture_unknown_)
+        return;
+      tag = CAPTURE_UNKNOWN_TAG;
+      break;
+  }
 
   char hex[::atlantic_v5::MAX_FRAME * 2 + 1];
   to_hex(f.raw(), f.raw_len(), hex);
-  ESP_LOGD(TAG, "frame %s %s", channel_name(f.channel()), hex);
+  ESP_LOGD(tag, "%s %s", channel_name(f.channel()), hex);
 }
 
-void AtlanticV5Component::frame_log_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us) {
+void AtlanticV5Component::frame_capture_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us) {
   (void) t_us;
-  static_cast<AtlanticV5Component *>(ctx)->maybe_log_frame(f);
+  static_cast<AtlanticV5Component *>(ctx)->maybe_capture_frame(f);
 }
 #endif
 
