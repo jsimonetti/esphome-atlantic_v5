@@ -134,6 +134,8 @@ binary_sensor:
       name: Connected
     heating_active:
       name: Heating
+    heating_element_active:
+      name: Heating element
     input_i1:
       name: Input I1
     input_i2:

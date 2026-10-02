@@ -32,7 +32,7 @@
 {"t_us":366744,"ch":"bus","hex":"0164FEE5030C000000000000007D00000010D0A5","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":366744,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":366744,"ch":"bus","hex":"0164FEE8030C000000000000007D000000101DA0","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":366744,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":366744,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":366744,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":366744,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":366744,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -82,7 +82,7 @@
 {"t_us":888782,"ch":"bus","hex":"0164FEE5030C000000000000007E0000001094A5","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":888782,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":888782,"ch":"bus","hex":"0164FEE8030C000000000000007E0000001059A0","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":888782,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":888782,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":888782,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":888782,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":888782,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -132,7 +132,7 @@
 {"t_us":1693902,"ch":"bus","hex":"0164FEE5030C000000000000007F00000010A965","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":1693902,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":1693902,"ch":"bus","hex":"0164FEE8030C000000000000007F000000106460","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":1693902,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":1693902,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":1693902,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":1693902,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":1693902,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -182,7 +182,7 @@
 {"t_us":2517742,"ch":"bus","hex":"0164FEE5030C000000000000007F00000010A965","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":2517742,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":2517742,"ch":"bus","hex":"0164FEE8030C000000000000007F000000106460","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":2517742,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":2517742,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":2517742,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":2517742,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":2517742,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -232,7 +232,7 @@
 {"t_us":3006747,"ch":"bus","hex":"0164FEE5030C000000000000008000000010BD71","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":3006747,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":3006747,"ch":"bus","hex":"0164FEE8030C0000000000000080000000107074","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":3006747,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":3006747,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":3006747,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":3006747,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":3006747,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -282,7 +282,7 @@
 {"t_us":3685830,"ch":"bus","hex":"0164FEE5030C00000000000000810000001080B1","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":3685830,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":3685830,"ch":"bus","hex":"0164FEE8030C0000000000000081000000104DB4","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":3685830,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":3685830,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":3685830,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":3685830,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":3685830,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -332,7 +332,7 @@
 {"t_us":4490899,"ch":"bus","hex":"0164FEE5030C000000000000008200000010C4B1","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":4490899,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":4490899,"ch":"bus","hex":"0164FEE8030C00000000000000820000001009B4","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":4490899,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":4490899,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":4490899,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":4490899,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":4490899,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -382,7 +382,7 @@
 {"t_us":5086756,"ch":"bus","hex":"0164FEE5030C000000000000008200000010C4B1","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":5086756,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":5086756,"ch":"bus","hex":"0164FEE8030C00000000000000820000001009B4","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":5086756,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":5086756,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":5086756,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":5086756,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":5086756,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -432,7 +432,7 @@
 {"t_us":5681751,"ch":"bus","hex":"0164FEE5030C000000000000008300000010F971","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":5681751,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":5681751,"ch":"bus","hex":"0164FEE8030C0000000000000083000000103474","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":5681751,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":5681751,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":5681751,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":5681751,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":5681751,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}
@@ -482,7 +482,7 @@
 {"t_us":6720028,"ch":"bus","hex":"0164FEE5030C0000000000000084000000104CB1","key":"0164FEE503","crc":true,"values":[{"id":"cycle_2_active","b":true},{"id":"cycle_2_count","u":16}]}
 {"t_us":6720028,"ch":"bus","hex":"0164FEE8036901","key":"0164FEE803","crc":true,"values":[]}
 {"t_us":6720028,"ch":"bus","hex":"0164FEE8030C00000000000000840000001081B4","key":"0164FEE803","crc":true,"values":[{"id":"cycle_3_active","b":true},{"id":"cycle_3_count","u":16}]}
-{"t_us":6720028,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[]}
+{"t_us":6720028,"ch":"bus","hex":"0165FEF701010049C5","key":"0165FEF701","crc":true,"values":[{"id":"heating_element_active","b":false}]}
 {"t_us":6720028,"ch":"bus","hex":"0165FEF701E10C","key":"0165FEF701","crc":true,"values":[]}
 {"t_us":6720028,"ch":"bus","hex":"0165FEF90101004B2D","key":"0165FEF901","crc":true,"values":[]}
 {"t_us":6720028,"ch":"bus","hex":"0165FEF901E56C","key":"0165FEF901","crc":true,"values":[]}

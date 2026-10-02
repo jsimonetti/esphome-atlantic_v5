@@ -161,22 +161,31 @@ a label to test, not as established meaning.
 | Cycle | Header | Ran | Candidate subsystem | Basis |
 |---|---|---|---|---|
 | 3 | `0x0164FEE803` | 09:29:02.6 → 09:52:14.1 | the demand period as a whole | first to start, last to stop; no independent corroboration |
-| 2 | `0x0164FEE503` | 09:30:10.8 → 09:52:05.6 | compressor | starts with `0x0165FEF901` → `64` and `heating active`; ~500 W inferred by subtraction, never measured alone |
-| 1 | `0x0164FEE203` | 09:31:23.7 → 09:52:05.5 | electric element | strongest of the five: starts 0.7 s after `0x0165FEF701` → `64`, nothing else changed on the bus for 40 s either side, and a metered +1200 W step followed |
+| 2 | `0x0164FEE503` | 09:30:10.8 → 09:52:05.6 | compressor | starts with `0x0165FEF901` → `64` and `heating active`; ~500 W, since corroborated by a later run that had the compressor on and the element off |
+| 1 | `0x0164FEE203` | 09:31:23.7 → 09:52:05.5 | electric element | strongest of the five: starts 0.7 s after `0x0165FEF701` → `64`, no other bus value changed for 40 s either side, and a metered +1200 W step followed. A `boost` select had been applied shortly before, but see below — it is not what drove it |
 | 6 | `0x0164FEF103` | two bursts, ~9 s each | a start-up / shut-down transient | concurrent with `0x0165FF0101` = `FFFFFFFF64`; what it physically is, unknown |
 | 4, 5 | `0x0164FEEB03`, `0x0164FEEE03` | never | — | idle through a full heating cycle; no hypothesis |
 
 The power figures come from a household meter, not from the bus: a +1200 W step
 when cycle 1 started, and a ~1700 W drop when cycles 1 and 2 stopped together,
-which is *consistent with* 1200 W of element plus ~500 W of compressor. The
-1700 was read approximately and the compressor's own draw has never been
-measured in isolation, so the decomposition is arithmetic that fits, not a
-measurement.
+which is *consistent with* 1200 W of element plus ~500 W of compressor.
 
-A later session weakens the element story in one respect: `boost` was selected
-from idle, `0x0165FEF701` stayed `00` for the whole 9-minute run and metered
-power never exceeded ~500 W. So whatever drives `0x0165FEF701` is conditional,
-and "`boost` starts the element" is not a rule.
+A later session supplies the missing control for that subtraction rather than
+undermining it. `boost` was selected from idle, `0x0165FEF701` stayed `00` for
+the whole 9-minute run, and metered power never exceeded ~500 W: a run with the
+compressor on and no element, which is the ~500 W figure the decomposition had
+assumed without ever observing. Three observations now agree —
+`0x0165FEF701` → `64` with +1200 W, `64` → `00` with the ~1700 W drop, and a
+run that never left `00` and never passed ~500 W. `0x0165FEF701` tracking the
+electric element is the reading the meter supports in both directions.
+
+What that session refutes is a narrower claim: `boost` was asserted and the
+element did not start, so `boost` does not drive `0x0165FEF701`. What gates the
+element is still unknown.
+
+The caveats that remain are about reach, not about the correlation: one
+appliance, one household meter reading deltas rather than a per-circuit
+measurement, and the 1700 read approximately.
 
 **Text field widths are documented, not enforced.** The `Len` column below
 records the width every observed firmware uses, but the decoder validates a
@@ -226,9 +235,23 @@ Headers with an established meaning.
 | **`0x0164FF1403`** | M | 1 s | 3 | 3 × bool | input I2, input I1, heating active — **the rewrite target** |
 | `0x0165000301` | H | init | 17 | text | HMI version |
 | `0x0165000A01` | H | init | 13 | text | HMI model |
+| `0x0165FEF701` | H | 1 s | 1 | bool | heating element active — *assumed, see below* |
 
 The firmware version and all three evaporator min/max pairs are decoded here but
 not by the AquaMQTT fork, which documents them without implementing them.
+
+### Assumed mappings
+
+A subset of the table above whose meaning is the best available reading of the
+evidence rather than an established fact. They are decoded and published exactly
+like any other mapped header — `header::ASSUMED` in `catalog.h` lists them so
+that "which meanings has this project actually established?" stays answerable
+without reading prose. Treat a disagreement between one of these and the
+appliance as evidence against the mapping, not as a fault.
+
+| Header key | Entity | Evidence | What would settle it |
+|---|---|---|---|
+| `0x0165FEF701` | `heating_element_active` | three household-meter observations agree: `00` → `64` with +1200 W, `64` → `00` with the ~1700 W drop, and a 9-minute run that never left `00` and never passed ~500 W. Origin `H`, so a command rather than a report | a second appliance, or per-circuit metering. Also unresolved: the wire value is `00` or `64` (= 100) and has never been seen at another non-zero value, so a modulating element would show this should be a percentage, not a bool |
 
 ### Unmapped messages
 
@@ -256,7 +279,6 @@ rewritten.
 | `0x0165FDF802` | H | init | 2 | `0007` |
 | `0x0165FDFB02` | H | init | 2 | `0011` |
 | `0x0165FDFE02` | H | init | 2 | `0001` |
-| `0x0165FEF701` | H | 1 s | 1 | `00` or `64` — seen `64` once, alongside a metered +1200 W step; possibly an electric element command |
 | `0x0165FEF901` | H | 1 s | 1 | `00` or `64` — tracks the compressor's apparent run span |
 | `0x0165FEFB01` | H | 1 s | 1 | `00` or `64` — spans the whole run, including the post-run |
 | `0x0165FEFD01` | H | 1 s | 1 | `00` |
@@ -347,7 +369,9 @@ rely on it.
 **`boost` does not reliably start the electric element.** `0x0165FEF701` went to
 `64` in one session (applied to an already-running compressor, water 5 K low) and
 stayed `00` in another (applied from idle, water ~4 K higher, held 5 minutes,
-metered power never above ~500 W). What gates it is unknown.
+metered power never above ~500 W). The meter agreed with `0x0165FEF701` both
+times, so this is a statement about what `boost` does, not about what the frame
+means. What gates the element is unknown.
 
 Hard constraints:
 
@@ -375,8 +399,9 @@ A user with hardware can close these:
 2. Does `0x0164158301` change with the anti-legionella setpoint?
 3. Do the six cycle counters map to compressor, fan, defrost, electric element…?
    Candidate labels for cycles 1, 2, 3 and 6 are proposed in *Cycle triplet
-   semantics* on the strength of one activation; only cycle 1 has corroboration
-   outside the bus. Cycles 4 and 5 did not run once across two sessions spanning
+   semantics* on the strength of one activation; only cycles 1 and 2 have
+   corroboration outside the bus, both from the same household meter. Cycles 3
+   and 6 have none. Cycles 4 and 5 did not run once across two sessions spanning
    full heating cycles, so there is no hypothesis for them at all. Confirming
    any of these needs a second appliance, firmware documentation, or per-circuit
    power measurement.

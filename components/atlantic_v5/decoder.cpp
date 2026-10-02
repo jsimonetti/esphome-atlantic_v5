@@ -228,6 +228,14 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
     case header::HMI_MODEL:
       emit_text_field(f, sink, ctx, ENT_HMI_MODEL);
       break;
+    case header::HEATING_ELEMENT: {
+      if (!check_length(f, 1))
+        break;
+      // Wire value is 00 or 64 (= 100); only ever seen at those two, so the
+      // possible percentage is published as a bool. See docs/protocol.md.
+      emit_bool(sink, ctx, ENT_HEATING_ELEMENT_ACTIVE, codec::decode_bool(p));
+      break;
+    }
     default:
       if (is_unmapped_header(f.header_key()))
         stats_.unmapped_frames++;

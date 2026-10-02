@@ -18,6 +18,8 @@ def _diagnostic_schema():
 # the rest are diagnostic.
 BINARY_SENSORS = {
     "heating_active": ("ENT_HEATING_ACTIVE", binary_sensor.binary_sensor_schema()),
+    # Assumed mapping, not established - see docs/protocol.md.
+    "heating_element_active": ("ENT_HEATING_ELEMENT_ACTIVE", binary_sensor.binary_sensor_schema()),
     "input_i1": ("ENT_INPUT_I1", _diagnostic_schema()),
     "input_i2": ("ENT_INPUT_I2", _diagnostic_schema()),
     "cycle_1_active": ("ENT_CYCLE_1_ACTIVE", _diagnostic_schema()),

@@ -54,6 +54,8 @@ enum EntityId : uint16_t {
   ENT_HEATING_ACTIVE,
   ENT_HMI_VERSION,
   ENT_HMI_MODEL,
+  // Assumed, not established - see header::ASSUMED.
+  ENT_HEATING_ELEMENT_ACTIVE,
 
   // Diagnostics, off by default. The three framing counters come in two
   // flavours and exactly one flavour is live per mode: the unsuffixed ones in
@@ -107,6 +109,17 @@ constexpr uint64_t CYCLE_6 = 0x0164FEF103ULL;
 constexpr uint64_t INPUT_STATUS = 0x0164FF1403ULL;
 constexpr uint64_t HMI_VERSION = 0x0165000301ULL;
 constexpr uint64_t HMI_MODEL = 0x0165000A01ULL;
+constexpr uint64_t HEATING_ELEMENT = 0x0165FEF701ULL;
+
+// Subset of MAPPED whose meaning is a working hypothesis rather than an
+// established fact (docs/protocol.md "Assumed mappings"). These derive entities
+// exactly like any other mapped header - the array exists only so "which
+// meanings has this project actually established?" stays answerable in code.
+// Ascending, and every member must also appear in MAPPED.
+constexpr uint64_t ASSUMED[] = {
+    HEATING_ELEMENT,
+};
+constexpr size_t ASSUMED_COUNT = sizeof(ASSUMED) / sizeof(ASSUMED[0]);
 
 // Every mapped key above, ascending. Kept as a plain key array (rather than
 // only as named constants) so classify_header can binary-search it and the
@@ -134,6 +147,7 @@ constexpr uint64_t MAPPED[] = {
     INPUT_STATUS,
     HMI_VERSION,
     HMI_MODEL,
+    HEATING_ELEMENT,
 };
 constexpr size_t MAPPED_COUNT = sizeof(MAPPED) / sizeof(MAPPED[0]);
 
@@ -145,8 +159,8 @@ constexpr uint64_t UNMAPPED[] = {
     0x0164006501ULL, 0x0164007001ULL, 0x0164007101ULL, 0x0164007501ULL, 0x01640165FEULL, 0x0164152A01ULL,
     0x0164158301ULL, 0x016421B601ULL, 0x016443130DULL, 0x0164FDED01ULL, 0x0164FDFA01ULL, 0x0164FDFD01ULL,
     0x0164FE0001ULL, 0x0164FED801ULL, 0x0164FFDC01ULL, 0x0165152301ULL, 0x016516B301ULL, 0x0165FDF802ULL,
-    0x0165FDFB02ULL, 0x0165FDFE02ULL, 0x0165FEF701ULL, 0x0165FEF901ULL, 0x0165FEFB01ULL, 0x0165FEFD01ULL,
-    0x0165FEFF01ULL, 0x0165FF0101ULL, 0x0165FF0301ULL,
+    0x0165FDFB02ULL, 0x0165FDFE02ULL, 0x0165FEF901ULL, 0x0165FEFB01ULL, 0x0165FEFD01ULL, 0x0165FEFF01ULL,
+    0x0165FF0101ULL, 0x0165FF0301ULL,
 };
 constexpr size_t UNMAPPED_COUNT = sizeof(UNMAPPED) / sizeof(UNMAPPED[0]);
 
@@ -164,12 +178,26 @@ constexpr bool disjoint(const uint64_t *a, size_t an, const uint64_t *b, size_t 
         return false;
   return true;
 }
+constexpr bool subset(const uint64_t *a, size_t an, const uint64_t *b, size_t bn) {
+  for (size_t i = 0; i < an; i++) {
+    bool found = false;
+    for (size_t j = 0; j < bn; j++)
+      if (a[i] == b[j])
+        found = true;
+    if (!found)
+      return false;
+  }
+  return true;
+}
 }  // namespace detail
 
 static_assert(detail::ascending(MAPPED, MAPPED_COUNT), "header::MAPPED must be strictly ascending");
 static_assert(detail::ascending(UNMAPPED, UNMAPPED_COUNT), "header::UNMAPPED must be strictly ascending");
+static_assert(detail::ascending(ASSUMED, ASSUMED_COUNT), "header::ASSUMED must be strictly ascending");
 static_assert(detail::disjoint(MAPPED, MAPPED_COUNT, UNMAPPED, UNMAPPED_COUNT),
               "a header key cannot be both mapped and unmapped");
+static_assert(detail::subset(ASSUMED, ASSUMED_COUNT, MAPPED, MAPPED_COUNT),
+              "every header::ASSUMED key must also be in header::MAPPED");
 }  // namespace header
 
 // Where a header key sits in the message catalogue (CONTEXT.md).

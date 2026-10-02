@@ -523,6 +523,30 @@ int main() {
     CHECK(c.values[1].u == 104u);
   }
 
+  // --- 0165FEF701: an assumed mapping (header::ASSUMED), so its dispatch arm
+  // needs the same coverage as any other. The only wire values ever observed
+  // are 00 and 64; the golden captures cover 00 alone. ---
+  {
+    for (uint8_t wire : {uint8_t{0x00}, uint8_t{0x64}}) {
+      atlantic_v5::Frame f = make_frame(atlantic_v5::header::HEATING_ELEMENT, &wire, 1);
+      atlantic_v5::Decoder decoder;
+      Collector c;
+      decoder.decode(f, collect, &c);
+      CHECK(c.values.size() == 1);
+      CHECK(c.values[0].id == atlantic_v5::ENT_HEATING_ELEMENT_ACTIVE);
+      CHECK(c.values[0].b == (wire != 0));
+      CHECK(decoder.stats().unmapped_frames == 0);
+      CHECK(decoder.stats().unknown_headers == 0);
+    }
+
+    const uint8_t two[] = {0x64, 0x00};
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::HEATING_ELEMENT, two, 2);
+    atlantic_v5::Decoder decoder;
+    Collector c;
+    decoder.decode(f, collect, &c);
+    CHECK(c.values.empty());
+  }
+
   // --- header::MAPPED and decode()'s case labels are two hand-maintained
   // lists with nothing tying them together. A payload-less frame
   // for a mapped header is silently skipped by design (the request
