@@ -33,100 +33,100 @@ atlantic_v5:
 sensor:
   - platform: atlantic_v5
     water_temperature:
-      name: DHW water temperature
+      name: Water temperature
     compressor_outlet_temperature:
-      name: DHW compressor outlet temperature
+      name: Compressor outlet temperature
     air_inlet_temperature:
-      name: DHW air inlet temperature
+      name: Air inlet temperature
     evaporator_1_temperature:
-      name: DHW evaporator 1 temperature
+      name: Evaporator 1 temperature
     evaporator_2_temperature:
-      name: DHW evaporator 2 temperature
+      name: Evaporator 2 temperature
     evaporator_3_temperature:
-      name: DHW evaporator 3 temperature
+      name: Evaporator 3 temperature
     setpoint:
-      name: DHW setpoint
+      name: Setpoint
     water_temperature_min:
-      name: DHW water temperature min
+      name: Water temperature min
     water_temperature_max:
-      name: DHW water temperature max
+      name: Water temperature max
     compressor_outlet_temperature_min:
-      name: DHW compressor outlet temperature min
+      name: Compressor outlet temperature min
     compressor_outlet_temperature_max:
-      name: DHW compressor outlet temperature max
+      name: Compressor outlet temperature max
     air_inlet_temperature_min:
-      name: DHW air inlet temperature min
+      name: Air inlet temperature min
     air_inlet_temperature_max:
-      name: DHW air inlet temperature max
+      name: Air inlet temperature max
     evaporator_1_temperature_min:
-      name: DHW evaporator 1 temperature min
+      name: Evaporator 1 temperature min
     evaporator_1_temperature_max:
-      name: DHW evaporator 1 temperature max
+      name: Evaporator 1 temperature max
     evaporator_2_temperature_min:
-      name: DHW evaporator 2 temperature min
+      name: Evaporator 2 temperature min
     evaporator_2_temperature_max:
-      name: DHW evaporator 2 temperature max
+      name: Evaporator 2 temperature max
     evaporator_3_temperature_min:
-      name: DHW evaporator 3 temperature min
+      name: Evaporator 3 temperature min
     evaporator_3_temperature_max:
-      name: DHW evaporator 3 temperature max
+      name: Evaporator 3 temperature max
     cycle_1_count:
-      name: DHW cycle 1 count
+      name: Cycle 1 count
     cycle_2_count:
-      name: DHW cycle 2 count
+      name: Cycle 2 count
     cycle_3_count:
-      name: DHW cycle 3 count
+      name: Cycle 3 count
     cycle_4_count:
-      name: DHW cycle 4 count
+      name: Cycle 4 count
     cycle_5_count:
-      name: DHW cycle 5 count
+      name: Cycle 5 count
     cycle_6_count:
-      name: DHW cycle 6 count
+      name: Cycle 6 count
     # Framing counters, listener-only spelling (one wire, one assembler).
     # In mode: mitm these are rejected in favour of the _hmi/_main variants.
     valid_frames:
-      name: DHW valid frames
+      name: Valid frames
     crc_errors:
-      name: DHW CRC errors
+      name: CRC errors
     dropped_bytes:
-      name: DHW dropped bytes
+      name: Dropped bytes
     unknown_frames:
-      name: DHW unknown frames
+      name: Unknown frames
 
 binary_sensor:
   - platform: atlantic_v5
     connected:
-      name: DHW connected
+      name: Connected
     heating_active:
-      name: DHW heating
+      name: Heating
     input_i1:
-      name: DHW input I1
+      name: Input I1
     input_i2:
-      name: DHW input I2
+      name: Input I2
     cycle_1_active:
-      name: DHW cycle 1 active
+      name: Cycle 1 active
     cycle_2_active:
-      name: DHW cycle 2 active
+      name: Cycle 2 active
     cycle_3_active:
-      name: DHW cycle 3 active
+      name: Cycle 3 active
     cycle_4_active:
-      name: DHW cycle 4 active
+      name: Cycle 4 active
     cycle_5_active:
-      name: DHW cycle 5 active
+      name: Cycle 5 active
     cycle_6_active:
-      name: DHW cycle 6 active
+      name: Cycle 6 active
 
 text_sensor:
   - platform: atlantic_v5
     firmware_version:
-      name: DHW firmware version
+      name: Firmware version
     serial_number:
-      name: DHW serial number
+      name: Serial number
     power_board_version:
-      name: DHW power board version
+      name: Power board version
     controller_model:
-      name: DHW controller model
+      name: Controller model
     hmi_version:
-      name: DHW HMI version
+      name: HMI version
     hmi_model:
-      name: DHW HMI model
+      name: HMI model

@@ -357,7 +357,7 @@ atlantic_v5:
 select:
   - platform: atlantic_v5
     control_mode:
-      name: DHW operation mode
+      name: Operation mode
 ```
 
 The only frame this component is willing to alter in flight is the
@@ -401,29 +401,29 @@ so they don't clutter a default dashboard:
 sensor:
   - platform: atlantic_v5
     # listener only — one wire, one assembler:
-    valid_frames: {name: DHW valid frames}
-    crc_errors: {name: DHW CRC errors}
-    dropped_bytes: {name: DHW dropped bytes}
+    valid_frames: {name: Valid frames}
+    crc_errors: {name: CRC errors}
+    dropped_bytes: {name: Dropped bytes}
     # mitm only — one assembler per side, reported separately:
-    valid_frames_hmi: {name: DHW valid frames HMI}
-    crc_errors_hmi: {name: DHW CRC errors HMI}
-    dropped_bytes_hmi: {name: DHW dropped bytes HMI}
-    valid_frames_main: {name: DHW valid frames MAIN}
-    crc_errors_main: {name: DHW CRC errors MAIN}
-    dropped_bytes_main: {name: DHW dropped bytes MAIN}
+    valid_frames_hmi: {name: Valid frames HMI}
+    crc_errors_hmi: {name: CRC errors HMI}
+    dropped_bytes_hmi: {name: Dropped bytes HMI}
+    valid_frames_main: {name: Valid frames MAIN}
+    crc_errors_main: {name: CRC errors MAIN}
+    dropped_bytes_main: {name: Dropped bytes MAIN}
     # both modes:
-    unknown_frames: {name: DHW unknown frames}
+    unknown_frames: {name: Unknown frames}
     # mitm-only (stay at 0 in listener mode):
-    frames_relayed: {name: DHW frames relayed}
-    rewrites_applied: {name: DHW rewrites applied}
-    queue_overflows: {name: DHW queue overflows}
-    relay_latency_max_us: {name: DHW relay latency max}
-    relay_latency_avg_us: {name: DHW relay latency avg}
-    task_stack_free: {name: DHW relay task stack free}
+    frames_relayed: {name: Frames relayed}
+    rewrites_applied: {name: Rewrites applied}
+    queue_overflows: {name: Queue overflows}
+    relay_latency_max_us: {name: Relay latency max}
+    relay_latency_avg_us: {name: Relay latency avg}
+    task_stack_free: {name: Relay task stack free}
 
 binary_sensor:
   - platform: atlantic_v5
-    connected: {name: DHW connected}
+    connected: {name: Connected}
 ```
 
 `connected` reports whether the appliance is still talking, in both modes. It
