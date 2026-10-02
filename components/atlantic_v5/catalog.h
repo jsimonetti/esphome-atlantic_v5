@@ -180,6 +180,8 @@ enum class HeaderClass : uint8_t {
   UNKNOWN,   // absent from the catalogue entirely
 };
 
+// The one lookup that answers the full three-way split, by header key alone:
+// which of the two tables, if either, holds key.
 HeaderClass classify_header(uint64_t key);
 
 // True for a header key in header::UNMAPPED: known, expected traffic with no
