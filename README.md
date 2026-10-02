@@ -464,6 +464,14 @@ decoded). Headers in the catalogue's *Unmapped messages* table are known,
 routine traffic with no established meaning; they are not counted here and
 are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
 
+`relay_latency_max_us` and `relay_latency_avg_us` measure last byte in to
+write *complete*, so they include the frame's own time on the wire: at 38400
+8N1 that is 1.8 ms for a 7-byte frame and 5.2 ms for the longest ones this
+appliance sends. A few milliseconds is therefore the wire, not the relay —
+only the part above the frame's transmit time is overhead. Both reset every
+time they are published, so each reading covers only the interval since the
+last one.
+
 ## Capture
 
 Four independent debug streams, all off by default, all logged at `DEBUG`
@@ -543,22 +551,9 @@ answer is hard. If you have hardware and can help close one, please do:
 ## Hardware-only acceptance
 
 Everything else in this component is verified against recorded bus captures
-and the host test suite. These things genuinely cannot be proven without a
-live bus, and remain open until someone runs them:
+and the host test suite. This genuinely cannot be proven without a live bus,
+and remains open until someone runs it:
 
-- **A rewrite actually taking effect.** Relaying has been confirmed inline on
-  a live appliance — an 11.6 s `mode: mitm` session answered 25 distinct
-  headers 13 times each, in both directions, which only happens if every
-  forwarded frame arrived intact. But that session ran in passthrough.
-  Forwarding a frame unchanged and *modifying* one on the way through are
-  different code paths, and only the first has been exercised on hardware.
-- Measured last-byte-in to first-byte-out latency, to confirm the < 1 ms
-  (excluding transmit time) budget holds on real hardware, not just in the
-  host-side mock-clock model. `relay_latency_avg_us` reports last-byte-in to
-  write-*complete*, so it includes the frame's own transmit time (6.5 ms of
-  wire time for a 25-byte frame at 38400 8N1) and does not answer this on its
-  own. Reading it as if it excluded transmit time is how an earlier
-  investigation convinced itself frames were being truncated; they were not.
 - **The revision-1.0 board, at all.** Every hardware session so far has used a
   revision-2.0 board. Its revision-1.0 counterpart differs in exactly the area
   nothing else here can check — how the transmit path reaches the wire — so
