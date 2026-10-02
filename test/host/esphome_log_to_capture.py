@@ -4,7 +4,7 @@
 The component's `bus_capture: true` option logs one line per
 byte-chunk under the `atlantic_v5.bus_capture` tag:
 
-    [12:34:56][I][atlantic_v5.bus_capture:031]: BUSCAP,4808918,bus,0165000301...
+    [12:34:56][D][atlantic_v5.bus_capture:031]: BUSCAP,4808918,bus,0165000301...
 
 ESPHome always prepends its own timestamp/tag/level (and, on a tty, ANSI
 colour), so the log line can never be the bare CSV row the replay CLI wants.

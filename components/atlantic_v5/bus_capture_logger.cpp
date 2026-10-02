@@ -28,7 +28,7 @@ static const char *const CAPTURE_TAG = "atlantic_v5.bus_capture";
 void BusCaptureLogger::flush(int64_t t_us) {
   char hex[BUF_LEN * 2 + 1];
   to_hex(this->buf_, this->len_, hex);
-  ESP_LOGI(CAPTURE_TAG, "BUSCAP,%lld,%s,%s", static_cast<long long>(t_us), this->channel_tag_, hex);
+  ESP_LOGD(CAPTURE_TAG, "BUSCAP,%lld,%s,%s", static_cast<long long>(t_us), this->channel_tag_, hex);
   this->len_ = 0;
 }
 

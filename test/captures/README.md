@@ -72,7 +72,7 @@ instead of `bus`, and the converter keeps the two apart. Replay such a capture
 with `--mode mitm`.
 
 The device logs `BUSCAP,<t_us>,<channel>,<hex>` under the
-`atlantic_v5.bus_capture` tag at `INFO` level; ESPHome always prepends its own
+`atlantic_v5.bus_capture` tag at `DEBUG` level; ESPHome always prepends its own
 timestamp/tag/level (and ANSI colour on a tty), which is what
 [`esphome_log_to_capture.py`](../host/esphome_log_to_capture.py) strips. It
 also rebases timestamps onto the first chunk, because the device clock is
