@@ -75,7 +75,6 @@ enum EntityId : uint16_t {
   ENT_RELAY_LATENCY_MAX_US,
   ENT_RELAY_LATENCY_AVG_US,
   ENT_TASK_STACK_FREE,
-  ENT_LAST_UNKNOWN_FRAME,
   // Not wire traffic either: the staleness gate's own state.
   ENT_CONNECTED,
   ENT_COUNT

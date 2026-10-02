@@ -75,14 +75,6 @@ class Decoder {
     // forever on healthy hardware, so it is deliberately never published as an
     // entity - it exists to keep unknown_headers meaningful.
     uint32_t unmapped_frames = 0;
-    // The most recent header_key() that fell to the unknown-header case, for the
-    // last_unknown_frame diagnostic. 0 (never a valid header, byte 0 is
-    // always 0x01) until the first unknown header is seen.
-    uint64_t last_unknown_header = 0;
-    // That frame's payload, so the diagnostic can show what the unrecognised
-    // header carried and not just its key. 0-length for a payload-less frame.
-    uint8_t last_unknown_payload[MAX_PAYLOAD] = {};
-    uint8_t last_unknown_payload_len = 0;
   };
   const Stats &stats() const { return stats_; }
 
@@ -92,7 +84,6 @@ class Decoder {
   void emit_text_field(const Frame &f, Sink sink, void *ctx, uint16_t id) const;
   void emit_minmax(const Frame &f, Sink sink, void *ctx, uint16_t min_id, uint16_t max_id) const;
   void emit_cycle(const Frame &f, Sink sink, void *ctx, uint16_t active_id, uint16_t count_id) const;
-  void record_unknown(const Frame &f) const;
 
   mutable Stats stats_;
 };

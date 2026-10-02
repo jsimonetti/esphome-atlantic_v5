@@ -27,15 +27,6 @@ void to_hex(const uint8_t *data, size_t len, char *out) {
   out[len * 2] = '\0';
 }
 
-// The 5-byte header key as 10 uppercase hex chars, matching entity/log
-// conventions elsewhere.
-void format_header_hex(uint64_t key, char *out) {
-  uint8_t bytes[::atlantic_v5::HEADER_LEN];
-  for (size_t i = 0; i < ::atlantic_v5::HEADER_LEN; i++)
-    bytes[i] = static_cast<uint8_t>(key >> ((::atlantic_v5::HEADER_LEN - 1 - i) * 8));
-  to_hex(bytes, sizeof(bytes), out);
-}
-
 const char *channel_name(::atlantic_v5::Channel ch) {
   switch (ch) {
     case ::atlantic_v5::Channel::HMI:
@@ -272,32 +263,6 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   // window since the previous diagnostics tick, not the time since boot.
   if (this->mode_ == Mode::MITM)
     this->relay_task_->reset_latency_stats();
-
-  // last_unknown_frame: rate-limited to once/10s, and only when a
-  // *new* unknown header has actually appeared since the last time we looked.
-  // Unmapped headers (docs/protocol.md) never reach this counter, so it only
-  // moves for traffic we have genuinely never seen before.
-  bool new_unknown = dec_stats->unknown_headers != this->last_unknown_headers_seen_;
-  this->last_unknown_headers_seen_ = dec_stats->unknown_headers;
-  if (!new_unknown || now_us - this->last_unknown_frame_us_ < 10'000'000)
-    return;
-  this->last_unknown_frame_us_ = now_us;
-
-  void *obj = this->entities_[::atlantic_v5::ENT_LAST_UNKNOWN_FRAME];
-  if (obj == nullptr || this->kinds_[::atlantic_v5::ENT_LAST_UNKNOWN_FRAME] != EntityKind::TEXT_SENSOR)
-    return;
-  // Header hex, then a separating space, then payload hex, then the NUL.
-  char hex[(::atlantic_v5::HEADER_LEN + ::atlantic_v5::MAX_PAYLOAD) * 2 + 2];
-  format_header_hex(dec_stats->last_unknown_header, hex);
-  // The payload is what actually identifies a new message, but it is only
-  // useful while someone is watching, so it rides on the log_raw_frames switch
-  // rather than on a config key of its own.
-  if (this->log_raw_frames_ && dec_stats->last_unknown_payload_len > 0) {
-    size_t n = ::atlantic_v5::HEADER_LEN * 2;
-    hex[n++] = ' ';
-    to_hex(dec_stats->last_unknown_payload, dec_stats->last_unknown_payload_len, hex + n);
-  }
-  static_cast<text_sensor::TextSensor *>(obj)->publish_state(hex);
 }
 
 void AtlanticV5Component::maybe_log_frame(const ::atlantic_v5::Frame &f) {

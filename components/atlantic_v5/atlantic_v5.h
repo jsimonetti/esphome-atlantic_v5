@@ -143,8 +143,6 @@ class AtlanticV5Component : public Component {
   BusCaptureLogger capture_logger_{"bus"};  // listener mode's single tapped wire
 
   uint32_t last_diag_us_{0};
-  uint32_t last_unknown_frame_us_{0};
-  uint32_t last_unknown_headers_seen_{0};
 #endif
   Mode mode_{Mode::LISTENER};
   bool bus_capture_{false};

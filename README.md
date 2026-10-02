@@ -387,10 +387,6 @@ sensor:
     relay_latency_avg_us: {name: DHW relay latency avg}
     task_stack_free: {name: DHW relay task stack free}
 
-text_sensor:
-  - platform: atlantic_v5
-    last_unknown_frame: {name: DHW last unknown frame}   # rate-limited, ~1/10s
-
 binary_sensor:
   - platform: atlantic_v5
     connected: {name: DHW connected}
@@ -437,10 +433,6 @@ traffic this component has never seen before (still forwarded/logged, never
 decoded). Headers in the catalogue's *Unmapped messages* table are known,
 routine traffic with no established meaning; they are not counted here and
 are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
-`last_unknown_frame` publishes the most recent such header as hex
-(e.g. `0164DEAD01`) so it can be reported upstream; with the
-`log_raw_frames` switch on, the frame's payload hex is appended after a
-space (e.g. `0164DEAD01 BEEF`).
 
 ### `log_raw_frames` vs `bus_capture`
 

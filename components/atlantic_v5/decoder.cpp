@@ -85,15 +85,6 @@ void emit_text(Decoder::Sink sink, void *ctx, uint16_t id, const char *text) {
   sink(ctx, v);
 }
 
-// The payload bytes a codec can actually read: the declared length clamped to
-// what the frame carried. payload_len() is a raw wire byte, so a CRC-valid
-// frame closed early by the silence backstop can claim more than it holds.
-uint8_t usable_payload_len(const Frame &f) {
-  uint8_t declared = f.payload_len();
-  uint8_t buffered = f.buffered_payload_len();
-  return declared < buffered ? declared : buffered;
-}
-
 }  // namespace
 
 // A known header with no payload is the request/ack side of a READ/WRITE
@@ -150,15 +141,6 @@ void Decoder::emit_cycle(const Frame &f, Sink sink, void *ctx, uint16_t active_i
   codec::Cycle c = codec::decode_cycle(f.payload());
   emit_bool(sink, ctx, active_id, c.active);
   emit_uint(sink, ctx, count_id, c.count);
-}
-
-void Decoder::record_unknown(const Frame &f) const {
-  stats_.unknown_headers++;
-  stats_.last_unknown_header = f.header_key();
-  uint8_t len = usable_payload_len(f);
-  stats_.last_unknown_payload_len = len;
-  if (len > 0)
-    std::memcpy(stats_.last_unknown_payload, f.payload(), len);
 }
 
 void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
@@ -250,7 +232,7 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
       if (is_unmapped_header(f.header_key()))
         stats_.unmapped_frames++;
       else
-        record_unknown(f);
+        stats_.unknown_headers++;
       break;
   }
 }

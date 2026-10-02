@@ -125,8 +125,6 @@ text_sensor:
       name: DHW HMI version
     hmi_model:
       name: DHW HMI model
-    last_unknown_frame:
-      name: DHW last unknown frame
 
 switch:
   - platform: atlantic_v5

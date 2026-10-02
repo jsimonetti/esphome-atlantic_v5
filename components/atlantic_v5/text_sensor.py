@@ -17,8 +17,6 @@ TEXT_SENSORS = {
     "controller_model": "ENT_CONTROLLER_MODEL",
     "hmi_version": "ENT_HMI_VERSION",
     "hmi_model": "ENT_HMI_MODEL",
-    # Diagnostics, off by default.
-    "last_unknown_frame": "ENT_LAST_UNKNOWN_FRAME",
 }
 
 CONFIG_SCHEMA = cv.Schema(
