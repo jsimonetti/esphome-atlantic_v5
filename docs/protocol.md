@@ -136,17 +136,47 @@ ambiguity is visible rather than silently treated as certainty.
 process. In state 0, field 1 counts seconds and field 2 is zero. In state 1,
 field 2 counts seconds and field 1 is zero. On the transition from state 1 back
 to state 0, field 3 increments. Therefore `active = (secs_in_state1 > 0)` and
-`count = field3`. The physical meaning of each of the six cycles is not
-established.
+`count = field3`.
 
-**The `active` polarity is in doubt.** In `real_single_bus_idle_polling.csv`,
-recorded on an Explorer V5 standing idle, all six frames report field 1 = 0 and
-field 2 ticking up one per second in lock-step, while `0x0164FF1403` reports
-`heating active = 0` throughout. Reading field 2 as "the active state" therefore
-labels an idle machine as six-for-six active, which is self-contradictory; state
-1 looks like the *idle* state and the mapping above looks inverted. The decoder
-still follows the rule as written, because flipping it on one idle capture would
-be trading one unverified polarity for another — see open question 7.
+**The `active` polarity looks inverted. Not yet changed in the decoder.**
+The rule above was written from `real_single_bus_idle_polling.csv`, an idle
+machine on which all six frames reported field 1 = 0 and field 2 ticking up in
+lock-step while `0x0164FF1403` reported `heating active = 0` — which labels an
+idle machine six-for-six active. The 2026-10-02 sessions point the other way:
+in both of them every cycle that moved left state 1 and began counting state 0
+at the moment something started running, and field 3 incremented on *entering*
+state 0. If that reading is right, state 0 is the running state and
+`active = (secs_in_state0 > 0)`, with `count = field3` unchanged.
+
+That is two sessions on one appliance, and no firmware documentation. It is the
+best-supported reading, not a confirmed one — what makes it more than a guess is
+that the state changes line up with independently metered power steps rather
+than only with other bus traffic. The decoder still implements the old rule.
+
+**What each cycle may count.** Hypotheses from the run spans in the 09:24–09:52
+session, which is covered by the four `real_dual_bus_*` captures other than
+`idle_polling`. One activation on one appliance — treat the Subsystem column as
+a label to test, not as established meaning.
+
+| Cycle | Header | Ran | Candidate subsystem | Basis |
+|---|---|---|---|---|
+| 3 | `0x0164FEE803` | 09:29:02.6 → 09:52:14.1 | the demand period as a whole | first to start, last to stop; no independent corroboration |
+| 2 | `0x0164FEE503` | 09:30:10.8 → 09:52:05.6 | compressor | starts with `0x0165FEF901` → `64` and `heating active`; ~500 W inferred by subtraction, never measured alone |
+| 1 | `0x0164FEE203` | 09:31:23.7 → 09:52:05.5 | electric element | strongest of the five: starts 0.7 s after `0x0165FEF701` → `64`, nothing else changed on the bus for 40 s either side, and a metered +1200 W step followed |
+| 6 | `0x0164FEF103` | two bursts, ~9 s each | a start-up / shut-down transient | concurrent with `0x0165FF0101` = `FFFFFFFF64`; what it physically is, unknown |
+| 4, 5 | `0x0164FEEB03`, `0x0164FEEE03` | never | — | idle through a full heating cycle; no hypothesis |
+
+The power figures come from a household meter, not from the bus: a +1200 W step
+when cycle 1 started, and a ~1700 W drop when cycles 1 and 2 stopped together,
+which is *consistent with* 1200 W of element plus ~500 W of compressor. The
+1700 was read approximately and the compressor's own draw has never been
+measured in isolation, so the decomposition is arithmetic that fits, not a
+measurement.
+
+A later session weakens the element story in one respect: `boost` was selected
+from idle, `0x0165FEF701` stayed `00` for the whole 9-minute run and metered
+power never exceeded ~500 W. So whatever drives `0x0165FEF701` is conditional,
+and "`boost` starts the element" is not a rule.
 
 **Text field widths are documented, not enforced.** The `Len` column below
 records the width every observed firmware uses, but the decoder validates a
@@ -187,12 +217,12 @@ Headers with an established meaning.
 | `0x0164FEC303` | M | 1 s | 5 | minmax | evaporator 1 temperature min / max |
 | `0x0164FEC603` | M | 1 s | 5 | minmax | evaporator 2 temperature min / max |
 | `0x0164FEC903` | M | 1 s | 5 | minmax | evaporator 3 temperature min / max |
-| `0x0164FEE203` | M | 1 s | 12 | cycle | cycle 1 active / count |
-| `0x0164FEE503` | M | 1 s | 12 | cycle | cycle 2 active / count |
-| `0x0164FEE803` | M | 1 s | 12 | cycle | cycle 3 active / count |
-| `0x0164FEEB03` | M | 1 s | 12 | cycle | cycle 4 active / count |
-| `0x0164FEEE03` | M | 1 s | 12 | cycle | cycle 5 active / count |
-| `0x0164FEF103` | M | 1 s | 12 | cycle | cycle 6 active / count |
+| `0x0164FEE203` | M | 1 s | 12 | cycle | cycle 1 active / count — possibly the electric element |
+| `0x0164FEE503` | M | 1 s | 12 | cycle | cycle 2 active / count — possibly the compressor |
+| `0x0164FEE803` | M | 1 s | 12 | cycle | cycle 3 active / count — possibly the demand period |
+| `0x0164FEEB03` | M | 1 s | 12 | cycle | cycle 4 active / count — never observed running |
+| `0x0164FEEE03` | M | 1 s | 12 | cycle | cycle 5 active / count — never observed running |
+| `0x0164FEF103` | M | 1 s | 12 | cycle | cycle 6 active / count — possibly a start/stop transient |
 | **`0x0164FF1403`** | M | 1 s | 3 | 3 × bool | input I2, input I1, heating active — **the rewrite target** |
 | `0x0165000301` | H | init | 17 | text | HMI version |
 | `0x0165000A01` | H | init | 13 | text | HMI model |
@@ -226,12 +256,12 @@ rewritten.
 | `0x0165FDF802` | H | init | 2 | `0007` |
 | `0x0165FDFB02` | H | init | 2 | `0011` |
 | `0x0165FDFE02` | H | init | 2 | `0001` |
-| `0x0165FEF701` | H | 1 s | 1 | `00` |
-| `0x0165FEF901` | H | 1 s | 1 | `00` or `64` — correlates with heat pump start/stop |
-| `0x0165FEFB01` | H | 1 s | 1 | `00` or `64` — correlates with heat pump start/stop |
+| `0x0165FEF701` | H | 1 s | 1 | `00` or `64` — seen `64` once, alongside a metered +1200 W step; possibly an electric element command |
+| `0x0165FEF901` | H | 1 s | 1 | `00` or `64` — tracks the compressor's apparent run span |
+| `0x0165FEFB01` | H | 1 s | 1 | `00` or `64` — spans the whole run, including the post-run |
 | `0x0165FEFD01` | H | 1 s | 1 | `00` |
 | `0x0165FEFF01` | H | 1 s | 1 | `00` |
-| `0x0165FF0101` | H | 1 s | 5 | `0000000000` or `FFFFFFFF64` — correlates with heat pump start/stop |
+| `0x0165FF0101` | H | 1 s | 5 | `0000000000` or `FFFFFFFF64` — held for ~8 s across each start and stop transient |
 | `0x0165FF0301` | H | 1 s | 1 | `00` or `2D` — correlates with heat pump start/stop |
 
 The four start/stop-correlated headers were previously listed with an `event`
@@ -253,7 +283,21 @@ t+67.8  0165FEF901  64
 t+68.0  0165FF0101  0000000000
 ```
 
-Deactivation on reaching the setpoint mirrors it, ending with `0165FEFB01 00`.
+**Observed deactivation sequence**, 21 minutes later in the same session
+(`real_dual_bus_deactivation.csv`), after the activation's minimum run time
+expired. It is not a strict mirror: the element and compressor stop first, the
+transient runs during the shutdown rather than before it, and a ~7 s post-run
+follows.
+
+```
+t+0.00  0165FEF701  00      electric element off
+t+0.03  0165FEF901  00      compressor off
+t+1.06  0165FF0101  FFFFFFFF64
+t+2.02  0164FF1403  heating active -> 0   (MAIN)
+t+8.56  0165FEFB01  00
+t+8.75  0165FF0101  0000000000
+t+8.78  0165FF0301  00
+```
 
 ## Control surface
 
@@ -271,13 +315,39 @@ MAIN → HMI. By rewriting bytes 0 and 1 on the way to the HMI, a man-in-the-mid
 makes the HMI believe the physical contacts are in a given state, and the unit
 behaves accordingly.
 
-| Mode | I2 | I1 | Effect |
+| Mode | I2 | I1 | Intended effect |
 |---|---|---|---|
 | `passthrough` | - | - | frame forwarded unmodified, real contacts apply |
 | `normal` | 0 | 0 | normal scheduled operation |
 | `eager` | 0 | 1 | heat now if possible (PV surplus semantics) |
 | `off` | 1 | 0 | suppress heating |
 | `boost` | 1 | 1 | maximum output |
+
+The `Intended effect` column is inherited from third-party documentation, not
+measured here. On this project's hardware only `eager`, `boost` and
+`passthrough` have ever been on the wire. **`off` and `normal` are untested**:
+`off` has never been observed doing anything — the one attempt landed on an
+appliance that had already shut down 12 s earlier — and `normal` is
+indistinguishable from `passthrough` while the physical contacts are open.
+
+**Deselecting appears not to stop a running unit.** Observed twice: a return to
+`passthrough` 30 s into a run did not interrupt it, and a `boost` → `passthrough`
+→ `eager` sequence mid-run produced no bus change at all. Two observations, both
+of `passthrough`; whether `off` can abort a run is unknown.
+
+**Run length is not fixed.** The appliance manual gives a 20–30 minute minimum
+run time for an activation triggered through I1 or I2, but the two runs recorded
+here lasted 20 m 42 s and 9 m 07 s, the second under a continuously asserted
+`eager`. Both happened to end with compressor outlet at ~64–65 °C while tank
+water was still rising or flat, which would be consistent with a discharge
+temperature limit ending the run — but two runs on one appliance cannot
+distinguish that from a setpoint, a timer, or something else entirely. Do not
+rely on it.
+
+**`boost` does not reliably start the electric element.** `0x0165FEF701` went to
+`64` in one session (applied to an already-running compressor, water 5 K low) and
+stayed `00` in another (applied from idle, water ~4 K higher, held 5 minutes,
+metered power never above ~500 W). What gates it is unknown.
 
 Hard constraints:
 
@@ -304,12 +374,31 @@ A user with hardware can close these:
 1. What is MAIN's actual response deadline after an HMI request?
 2. Does `0x0164158301` change with the anti-legionella setpoint?
 3. Do the six cycle counters map to compressor, fan, defrost, electric element…?
+   Candidate labels for cycles 1, 2, 3 and 6 are proposed in *Cycle triplet
+   semantics* on the strength of one activation; only cycle 1 has corroboration
+   outside the bus. Cycles 4 and 5 did not run once across two sessions spanning
+   full heating cycles, so there is no hypothesis for them at all. Confirming
+   any of these needs a second appliance, firmware documentation, or per-circuit
+   power measurement.
 4. Is `0x0165152301` the tank volume?
 5. What does the HMI do if a frame arrives with a valid CRC but altered content it
    did not expect? This establishes how much rewrite freedom exists.
 6. What do the four activation-correlated unmapped headers (`0x0165FEF901`,
-   `0x0165FEFB01`, `0x0165FF0101`, `0x0165FF0301`) actually encode? A capture
-   spanning a full activation and deactivation cycle would settle it.
-7. Is the cycle `active` polarity inverted? The same activation capture settles
-   it: if field 1 starts counting while `0x0164FF1403` reports heating, state 0
-   is the active state and `active = (secs_in_state0 > 0)`.
+   `0x0165FEFB01`, `0x0165FF0101`, `0x0165FF0301`) actually encode? Narrowed:
+   `0x0165FEF901` tracks the compressor's apparent run span and `0x0165FF0101`
+   brackets both transients. What `0x0165FEFB01` and `0x0165FF0301` add over
+   those two, and why `0x0165FEFB01` alone spans the post-run, is still open.
+7. Is the cycle `active` polarity inverted? Two sessions say yes — see *Cycle
+   triplet semantics* — but the decoder has not been changed and the reading has
+   only ever been checked against this one appliance.
+8. Is the element's power level fixed? `0x0165FEF701` and `0x0165FEF901` both
+   carry `64` = 100, which reads like a percentage, but no capture has shown
+   either at any other non-zero value. A unit with a modulating element or
+   compressor would settle it.
+9. What ends a run? Observed lengths of 20 m 42 s and 9 m 07 s, both finishing
+   with compressor outlet at ~64–65 °C. Candidates: a discharge temperature
+   limit, a water setpoint, a timer, or the manual's minimum run time elapsing.
+   Two runs cannot separate them; a run started from a cold compressor outlet
+   would be the cheapest discriminator.
+10. Does `off` (I2=1, I1=0) do anything at all? It has never been asserted
+    against a running unit, nor against an idle unit that wanted to heat.

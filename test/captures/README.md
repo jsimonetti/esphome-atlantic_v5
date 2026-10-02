@@ -57,6 +57,31 @@ is the only real-bytes golden over `replay_dual_bus` and the per-side framing
 path, which until now had nothing but `synthetic_dual_bus_basic.csv` (never
 freezable). It likewise has no init burst and so nothing to anonymise.
 
+`real_dual_bus_rewrite_eager.csv`, `real_dual_bus_heating_start.csv`,
+`real_dual_bus_rewrite_boost.csv` and `real_dual_bus_deactivation.csv` are four
+windows trimmed from one ~30 min `mitm` session in which the `control_mode`
+select was driven from `passthrough` to `eager`, then `boost`, then back to
+`passthrough`. Between them they cover the first non-idle bytes this project has
+recorded: the full activation sequence of
+[`docs/protocol.md`](../../docs/protocol.md) and, 21 minutes later, the matching
+deactivation; both `heating_active` edges; the only observation of
+`0x0165FEF701` carrying anything but `00`; and evaporator temperatures down to
+~5.9 °C with the compressor running. Each slice starts on a polling-round
+boundary and replays with zero CRC errors; each file's own `#` header records
+what the appliance and the select were doing.
+
+The same caveat applies to all four: the bus capture records the bytes
+*received* on each side, so the rewritten `0x0164FF1403` frames are not in them.
+Every such row is what MAIN reported (`input_i2` and `input_i1` both false), and
+that is also what the decoder publishes — see
+[ADR 0002](../../docs/adr/0002-input-entities-report-observed-input.md). What the
+captures show is the HMI's *reaction* to the rewrite, which is indirect evidence
+of it: the appliance started heating ~70 s after `eager` was selected and
+`0x0165FEF701` moved shortly after `boost` was selected. A later session saw
+`0x0165FEF701` stay `00` for a whole run under `boost`, so that second
+correlation does not generalise. The deactivation window is the exception to the
+caveat — nothing was being rewritten by then; the unit stopped on its own.
+
 ## Recording your own capture
 
 Set `capture: { bus: true }` on the `atlantic_v5:` hub, flash a devkit tapped
