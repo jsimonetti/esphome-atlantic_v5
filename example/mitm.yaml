@@ -19,7 +19,8 @@ external_components:
 atlantic_v5:
   id: dhw
   mode: mitm
-  bus_capture: true
+  capture:
+    bus: true
   timeout: 60s
   # Bus timing (defaults shown; uncomment to tune on unfamiliar hardware).
   # frame_silence: 4000us

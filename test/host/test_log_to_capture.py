@@ -28,7 +28,7 @@ def check(condition: bool, message: str) -> None:
 
 
 def log_line(row: str, colour: bool = False) -> str:
-    line = f"[12:34:56][I][atlantic_v5.bus_capture:031]: BUSCAP,{row}"
+    line = f"[12:34:56][I][atlantic_v5.capture.bus:031]: BUSCAP,{row}"
     return f"\x1b[0;36m{line}\x1b[0m" if colour else line
 
 

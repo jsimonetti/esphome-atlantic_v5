@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Turn `esphome logs` output into a canonical test/captures/*.csv file.
 
-The component's `bus_capture: true` option logs one line per
-byte-chunk under the `atlantic_v5.bus_capture` tag:
+The component's `capture: { bus: true }` option logs one line per
+byte-chunk under the `atlantic_v5.capture.bus` tag:
 
-    [12:34:56][D][atlantic_v5.bus_capture:031]: BUSCAP,4808918,bus,0165000301...
+    [12:34:56][D][atlantic_v5.capture.bus:031]: BUSCAP,4808918,bus,0165000301...
 
 ESPHome always prepends its own timestamp/tag/level (and, on a tty, ANSI
 colour), so the log line can never be the bare CSV row the replay CLI wants.
@@ -186,7 +186,7 @@ def main() -> int:
 
     if not rows:
         print(
-            "error: no BUSCAP lines found. Is `bus_capture: true` set on the atlantic_v5 "
+            "error: no BUSCAP lines found. Is `capture: { bus: true }` set on the atlantic_v5 "
             "hub, and is the logger level at least INFO?",
             file=sys.stderr,
         )

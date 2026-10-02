@@ -2,8 +2,8 @@
 #
 # Device:   Atlantic Explorer V5 (Odyssee / Calypso family), ESP32-S3 on the
 #           AquaMQTT rev-2.0 board cut into the HMI<->MAIN wire, mitm mode,
-#           bus_capture: true. Both sides are recorded separately, so every
-#           row is attributed to the side that sent it.
+#           with capture: { bus: true }. Both sides are recorded separately, so
+#           every row is attributed to the side that sent it.
 # Recorded: 2026-10-01 by this project (not a third-party transcription).
 # Window:   11.63 s, the whole `esphome logs` session: 649 chunks, 324 hmi and
 #           325 main, which is 13 complete HMI polling rounds. Nothing was

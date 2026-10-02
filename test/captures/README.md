@@ -59,8 +59,8 @@ freezable). It likewise has no init burst and so nothing to anonymise.
 
 ## Recording your own capture
 
-Set `bus_capture: true` on the `atlantic_v5:` hub, flash a devkit tapped onto
-the bus in listener mode, and pipe the logs through the converter:
+Set `capture: { bus: true }` on the `atlantic_v5:` hub, flash a devkit tapped
+onto the bus in listener mode, and pipe the logs through the converter:
 
 ```sh
 uv run esphome logs example/listener.yaml \
@@ -72,7 +72,7 @@ instead of `bus`, and the converter keeps the two apart. Replay such a capture
 with `--mode mitm`.
 
 The device logs `BUSCAP,<t_us>,<channel>,<hex>` under the
-`atlantic_v5.bus_capture` tag at `DEBUG` level; ESPHome always prepends its own
+`atlantic_v5.capture.bus` tag at `DEBUG` level; ESPHome always prepends its own
 timestamp/tag/level (and ANSI colour on a tty), which is what
 [`esphome_log_to_capture.py`](../host/esphome_log_to_capture.py) strips. It
 also rebases timestamps onto the first chunk, because the device clock is

@@ -19,7 +19,8 @@ external_components:
 atlantic_v5:
   id: dhw
   mode: listener
-  bus_capture: true
+  capture:
+    bus: true
   timeout: 60s
   hmi:
     uart_num: 1

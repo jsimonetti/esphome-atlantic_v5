@@ -1,7 +1,8 @@
 # Real single-bus capture from the project's own hardware.
 #
 # Device:   Atlantic Explorer V5 (Odyssee / Calypso family), ESP32-S3 devkit
-#           tapped onto the HMI<->MAIN wire, listener mode, bus_capture: true.
+#           tapped onto the HMI<->MAIN wire, listener mode, with
+#           capture: { bus: true }.
 # Recorded: 2026-10-01 by this project (not a third-party transcription).
 # Window:   the first 6.84 s of an 85 s `esphome logs` session, which is ten
 #           complete HMI polling rounds plus the opening frames of an eleventh.

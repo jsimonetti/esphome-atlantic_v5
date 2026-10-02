@@ -434,15 +434,15 @@ decoded). Headers in the catalogue's *Unmapped messages* table are known,
 routine traffic with no established meaning; they are not counted here and
 are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
 
-### `log_raw_frames` vs `bus_capture`
+### `log_raw_frames` vs `capture.bus`
 
 These solve two different problems and are easy to confuse:
 
-- **`bus_capture`** (`atlantic_v5: { bus_capture: true }`) is raw,
+- **Bus capture** (`atlantic_v5: { capture: { bus: true } }`) is raw,
   *pre-assembly* byte+timestamp logging, meant for harvesting
   `test/captures/*.csv` fixtures from your own hardware. It logs
   `BUSCAP,<t_us>,<channel>,<hex>` lines at `DEBUG` level under the
-  `atlantic_v5.bus_capture` logger tag — see `test/captures/README.md` for the
+  `atlantic_v5.capture.bus` logger tag — see `test/captures/README.md` for the
   converter script that turns those log lines into a canonical capture file.
 - **`log_raw_frames`** (the switch above) is post-assembly, post-CRC-check hex
   logging of already-framed frames, for live debugging of a specific header

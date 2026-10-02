@@ -64,7 +64,7 @@ _Avoid_: input state (ambiguous with effective input)
 **Effective input**:
 The I1/I2 values MAIN actually acts on — equal to the observed input under passthrough, and to the Rewrite's substituted values otherwise. Deliberately not an entity: it is already implied by the control-mode entity.
 
-**Bus capture** (`bus_capture`):
+**Bus capture** (`capture: { bus: true }`):
 Raw, pre-assembly byte+timestamp logging, used to harvest real `test/captures/*.csv` files from a user's own hardware. Runs upstream of the FrameAssembler; needs no decode logic.
 _Avoid_: raw frame dump, capture log
 

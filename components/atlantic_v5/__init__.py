@@ -45,7 +45,8 @@ MODES = {
 CONF_HMI = "hmi"
 CONF_MAIN = "main"
 CONF_UART_NUM = "uart_num"
-CONF_BUS_CAPTURE = "bus_capture"
+CONF_CAPTURE = "capture"
+CONF_BUS = "bus"
 CONF_TX_ENABLE_PIN = "tx_enable_pin"
 CONF_ONE_WIRE_MIRROR = "one_wire_mirror"
 CONF_RELAY_CORE = "relay_core"
@@ -94,6 +95,12 @@ SIDE_SCHEMA = cv.Schema(
         cv.Optional(CONF_ONE_WIRE_MIRROR, default=False): cv.boolean,
         cv.Optional(CONF_DIR_SETUP): cv.positive_time_period_microseconds,
         cv.Optional(CONF_DIR_HOLD): cv.positive_time_period_microseconds,
+    }
+)
+
+CAPTURE_SCHEMA = cv.Schema(
+    {
+        cv.Optional(CONF_BUS, default=False): cv.boolean,
     }
 )
 
@@ -170,7 +177,7 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(AtlanticV5Component),
             cv.Optional(CONF_MODE, default=MODE_LISTENER): cv.enum(MODES, lower=True),
-            cv.Optional(CONF_BUS_CAPTURE, default=False): cv.boolean,
+            cv.Optional(CONF_CAPTURE, default={}): CAPTURE_SCHEMA,
             # If no valid frame has been seen for timeout (default 60s),
             # publish NAN and mark the component failed, gated on
             # MAIN specifically, not on HMI traffic.
@@ -201,7 +208,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_mode(config[CONF_MODE]))
-    cg.add(var.set_bus_capture(config[CONF_BUS_CAPTURE]))
+    cg.add(var.set_bus_capture(config[CONF_CAPTURE][CONF_BUS]))
     cg.add(var.set_timeout(config[CONF_TIMEOUT]))
     cg.add(var.set_frame_silence(config[CONF_FRAME_SILENCE]))
 

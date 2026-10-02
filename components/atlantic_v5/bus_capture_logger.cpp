@@ -23,7 +23,7 @@ void to_hex(const uint8_t *data, size_t len, char *out) {
 }
 }  // namespace
 
-static const char *const CAPTURE_TAG = "atlantic_v5.bus_capture";
+static const char *const CAPTURE_TAG = "atlantic_v5.capture.bus";
 
 void BusCaptureLogger::flush(int64_t t_us) {
   char hex[BUF_LEN * 2 + 1];
