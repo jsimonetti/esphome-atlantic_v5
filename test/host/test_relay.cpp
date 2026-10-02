@@ -373,6 +373,43 @@ int main() {
     CHECK(hmi_io.writes_.empty());
   }
 
+  // --- Echo window across the 32-bit microsecond wrap (~71.6 min of uptime):
+  // echo_until_us is a timestamp in the same wrapping space as now_us, so the
+  // comparison must be a signed difference. A plain `now_us >= echo_until_us`
+  // leaves both sides gated off for a whole wrap period, and since nothing
+  // refreshes echo_until_us without a forwarded frame, the relay never recovers. ---
+  {
+    MockBusIo hmi_io, main_io;
+    RelayPolicy policy;
+    Relay relay(hmi_io, main_io, policy, Relay::Config{/*silence_us=*/4000, /*echo_drain_us=*/200});
+
+    const uint32_t before_wrap = 0xFFFFF000u;
+    std::vector<uint8_t> req = {0x01, 0x64, 0x00, 0x64, 0x01, 0, 0};
+    append_crc(req);
+
+    hmi_io.queue(before_wrap, req);
+    hmi_io.set_now(before_wrap);
+    main_io.set_now(before_wrap);
+    relay.poll(before_wrap);
+
+    CHECK(relay.stats().frames_relayed == 1);
+    CHECK(main_io.writes_.size() == 1);
+
+    // Clock wraps; MAIN answers well after the 200us drain window.
+    const uint32_t after_wrap = 50'000u;
+    std::vector<uint8_t> answer = {0x01, 0x65, 0x00, 0x64, 0x01, 0, 0};
+    append_crc(answer);
+
+    main_io.queue(after_wrap, answer);
+    hmi_io.set_now(after_wrap);
+    main_io.set_now(after_wrap);
+    relay.poll(after_wrap);
+
+    CHECK(relay.stats().frames_relayed == 2);
+    CHECK(hmi_io.writes_.size() == 1);
+    CHECK(hmi_io.writes_[0] == answer);
+  }
+
   // --- Raw capture piggyback: the capture sink sees
   // every chunk read from either side, tagged with the correct channel, including
   // the echoed chunk that echo accounting discards from framing, and is also

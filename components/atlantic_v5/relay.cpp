@@ -29,8 +29,13 @@ void Relay::service(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
     capture_sink_(capture_ctx_, in_channel, buf, static_cast<size_t>(n), now_us);
 
   // Bytes arriving inside the echo window are our own echo of a write to this
-  // side (3.5.3): dropped on the floor, never framed.
-  if (n > 0 && now_us >= in.echo_until_us) {
+  // side (3.5.3): dropped on the floor, never framed. Expressed as elapsed-since-write
+  // rather than a stored deadline compared with >=, because now_us is a 32-bit
+  // truncation of esp_timer_get_time() and wraps every ~71.6 min: a deadline
+  // comparison reads as "still inside the window" for a whole wrap period after
+  // the wrap, and since only a forwarded frame refreshes it, the relay never
+  // recovers. Unsigned subtraction is correct across the wrap.
+  if (n > 0 && now_us - in.last_write_us >= cfg_.echo_drain_us) {
     for (int i = 0; i < n; i++) {
       if (in.asm_.push(buf[i], now_us))
         forward(in, out, in_channel, now_us);
@@ -66,7 +71,7 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   // before the first echoed byte can arrive.
   uint32_t written_us = out.io.now_us();
   out.io.flush_input();
-  out.echo_until_us = written_us + cfg_.echo_drain_us;
+  out.last_write_us = written_us;
 
   stats_.frames_relayed++;
   if (rewritten)

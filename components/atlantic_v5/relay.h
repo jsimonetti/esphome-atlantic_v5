@@ -93,7 +93,8 @@ class Relay {
   struct Side {
     BusIo &io;
     FrameAssembler asm_;
-    uint32_t echo_until_us = 0;  // reads before this time are our own echo, see 3.5.3
+    // Reads within echo_drain_us of this are our own echo, see 3.5.3.
+    uint32_t last_write_us = 0;
   };
 
   // Drains in.io, feeds in.asm_, and forwards any completed frame to out.io.
