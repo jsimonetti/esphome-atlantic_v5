@@ -152,11 +152,9 @@ be trading one unverified polarity for another — see open question 7.
 records the width every observed firmware uses, but the decoder validates a
 `text` payload structurally — it must fit the frame as actually received and
 end in `0x00` — rather than requiring that exact width. A firmware revision
-with a different width still publishes its value, and increments the
-`text_length_variants` diagnostic so the divergence is reported rather than
-disappearing. Every other codec reads fixed offsets, so those widths *are*
-enforced exactly; a disagreement there rejects the frame and increments
-`length_mismatches`.
+with a different width still publishes its value. Every other codec reads fixed
+offsets, so those widths *are* enforced exactly; a disagreement there rejects
+the frame and publishes nothing.
 
 Always validate a payload before decoding it: against the header's expected
 length for every fixed-offset codec, structurally for `text` as described above.

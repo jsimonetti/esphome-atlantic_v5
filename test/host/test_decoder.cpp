@@ -126,7 +126,6 @@ void check_pair(uint64_t key, const uint8_t *payload, uint8_t len, atlantic_v5::
   atlantic_v5::Decoder decoder;
   out->values.clear();
   decoder.decode(f, collect, out);
-  CHECK(decoder.stats().length_mismatches == 0);
   CHECK(decoder.stats().unknown_headers == 0);
   CHECK(decoder.stats().unmapped_frames == 0);
   CHECK(out->values.size() == 2);
@@ -246,13 +245,11 @@ int main() {
     // and its MAIN ack on 0165FEF901: all four headers are in the *unmapped*
     // table (docs/protocol.md), so they are routine traffic, not anomalies.
     // The 5 payload-less READ requests for known headers (FEB006, FEBA03,
-    // FF1403, FEE203, 006401) are silently skipped, not counted as unknown or
-    // as a length mismatch (the request side of a READ carries no
-    // payload by design, that's not an anomaly).
+    // FF1403, FEE203, 006401) are silently skipped, not counted as unknown
+    // (the request side of a READ carries no payload by design).
     CHECK(decoder.stats().unmapped_frames == 4);
     CHECK(decoder.stats().unknown_headers == 0);
     CHECK(decoder.stats().last_unknown_header == 0);
-    CHECK(decoder.stats().length_mismatches == 0);
   }
   {
     // --- A capture of nothing but unmapped traffic must leave the
@@ -271,7 +268,6 @@ int main() {
     CHECK(decoder.stats().unknown_headers == 0);
     CHECK(decoder.stats().last_unknown_header == 0);
     CHECK(decoder.stats().last_unknown_payload_len == 0);
-    CHECK(decoder.stats().length_mismatches == 0);
   }
   {
     // --- is_unmapped_header: every key in the table is recognised, and a key
@@ -282,6 +278,16 @@ int main() {
       CHECK(!atlantic_v5::is_unmapped_header(atlantic_v5::header::MAPPED[i]));
     CHECK(!atlantic_v5::is_unmapped_header(0x0164DEAD01ULL));
     CHECK(!atlantic_v5::is_unmapped_header(0));
+  }
+  {
+    // --- classify_header: the three-way split of CONTEXT.md's vocabulary. ---
+    for (size_t i = 0; i < atlantic_v5::header::MAPPED_COUNT; i++)
+      CHECK(atlantic_v5::classify_header(atlantic_v5::header::MAPPED[i]) == atlantic_v5::HeaderClass::MAPPED);
+    for (size_t i = 0; i < atlantic_v5::header::UNMAPPED_COUNT; i++)
+      CHECK(atlantic_v5::classify_header(atlantic_v5::header::UNMAPPED[i]) == atlantic_v5::HeaderClass::UNMAPPED);
+    // Absent from docs/protocol.md entirely, and the empty key.
+    CHECK(atlantic_v5::classify_header(0x0164DEAD01ULL) == atlantic_v5::HeaderClass::UNKNOWN);
+    CHECK(atlantic_v5::classify_header(0) == atlantic_v5::HeaderClass::UNKNOWN);
   }
   {
     // --- last_unknown_header/_payload (behind the last_unknown_frame
@@ -371,11 +377,10 @@ int main() {
 
   // --- Text payload length is gated structurally, not pinned to the catalogue
   // width: a NUL-terminated field that fits the buffered frame and
-  // DecodedValue::text is published and counted as a variant; anything that
-  // would read past the frame, overflow the text buffer, or lack a terminator
-  // is rejected and counted as a mismatch. ---
+  // DecodedValue::text is published; anything that would read past the frame,
+  // overflow the text buffer, or lack a terminator is rejected. ---
   {
-    // Catalogue width (firmware_version, 17): decodes, neither counter moves.
+    // Catalogue width (firmware_version, 17): decodes.
     uint8_t payload[17] = {'2', '.', '9'};
     atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 17);
     atlantic_v5::Decoder decoder;
@@ -383,13 +388,10 @@ int main() {
     decoder.decode(f, collect, &c);
     CHECK(c.values.size() == 1);
     CHECK(std::strcmp(c.values[0].text, "2.9") == 0);
-    CHECK(decoder.stats().length_mismatches == 0);
-    CHECK(decoder.stats().text_length_variants == 0);
-    CHECK(decoder.stats().last_length_anomaly_header == 0);
   }
   {
     // Narrower than the catalogue but still NUL-terminated: same string,
-    // published, counted as a variant and not as a mismatch.
+    // published anyway.
     uint8_t payload[4] = {'2', '.', '9', 0x00};
     atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 4);
     atlantic_v5::Decoder decoder;
@@ -398,15 +400,10 @@ int main() {
     CHECK(c.values.size() == 1);
     CHECK(c.values[0].id == atlantic_v5::ENT_FIRMWARE_VERSION);
     CHECK(std::strcmp(c.values[0].text, "2.9") == 0);
-    CHECK(decoder.stats().text_length_variants == 1);
-    CHECK(decoder.stats().length_mismatches == 0);
-    CHECK(decoder.stats().last_length_anomaly_header == atlantic_v5::header::FIRMWARE_VERSION);
-    CHECK(decoder.stats().last_length_anomaly_expected == 17);
-    CHECK(decoder.stats().last_length_anomaly_actual == 4);
   }
   {
     // Wider than the catalogue, up to the last width DecodedValue::text can
-    // hold without clipping (23 chars + NUL): accepted, counted as a variant.
+    // hold without clipping (23 chars + NUL): accepted.
     uint8_t payload[23] = {};
     std::memset(payload, 'A', 22);
     atlantic_v5::Frame f = make_frame(atlantic_v5::header::CONTROLLER_MODEL, payload, 23);
@@ -415,8 +412,6 @@ int main() {
     decoder.decode(f, collect, &c);
     CHECK(c.values.size() == 1);
     CHECK(std::strlen(c.values[0].text) == 22);
-    CHECK(decoder.stats().text_length_variants == 1);
-    CHECK(decoder.stats().length_mismatches == 0);
   }
   {
     // One byte wider: decode_text would silently clip at 23, so reject instead.
@@ -428,9 +423,6 @@ int main() {
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
-    CHECK(decoder.stats().length_mismatches == 1);
-    CHECK(decoder.stats().text_length_variants == 0);
-    CHECK(decoder.stats().last_length_anomaly_actual == 24);
   }
   {
     // A length byte claiming more than the frame actually buffered: the exact
@@ -448,8 +440,6 @@ int main() {
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
-    CHECK(decoder.stats().length_mismatches == 1);
-    CHECK(decoder.stats().text_length_variants == 0);
   }
   {
     // No trailing NUL: structurally invalid whatever the width, never published.
@@ -460,12 +450,10 @@ int main() {
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
-    CHECK(decoder.stats().length_mismatches == 1);
-    CHECK(decoder.stats().text_length_variants == 0);
   }
   {
-    // A variant width that is *also* structurally invalid must land in the
-    // rejection counter only: text_length_variants means "published anyway".
+    // Off-catalogue width *and* no terminator: still rejected, so an accepted
+    // narrow width never implies the terminator check was skipped.
     uint8_t payload[4];
     std::memset(payload, 'A', sizeof(payload));
     atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 4);
@@ -473,8 +461,6 @@ int main() {
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
-    CHECK(decoder.stats().length_mismatches == 1);
-    CHECK(decoder.stats().text_length_variants == 0);
   }
   {
     // Scope guard: non-text codecs read fixed offsets into the payload, so
@@ -485,11 +471,6 @@ int main() {
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
-    CHECK(decoder.stats().length_mismatches == 1);
-    CHECK(decoder.stats().text_length_variants == 0);
-    CHECK(decoder.stats().last_length_anomaly_header == atlantic_v5::header::SETPOINT);
-    CHECK(decoder.stats().last_length_anomaly_expected == 2);
-    CHECK(decoder.stats().last_length_anomaly_actual == 3);
   }
   {
     // A fixed-offset codec must also refuse a frame that declares the
@@ -510,10 +491,6 @@ int main() {
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.empty());
-    CHECK(decoder.stats().length_mismatches == 1);
-    CHECK(decoder.stats().last_length_anomaly_header == atlantic_v5::header::WATER_TEMPERATURE_MINMAX);
-    CHECK(decoder.stats().last_length_anomaly_expected == 5);
-    CHECK(decoder.stats().last_length_anomaly_actual == 3);
   }
 
   // --- The seven mapped headers that appear in no capture fixture:
@@ -590,7 +567,6 @@ int main() {
     CHECK(decoder.stats().unknown_headers == 0);
     CHECK(decoder.stats().last_unknown_header == 0);
     CHECK(decoder.stats().unmapped_frames == 0);
-    CHECK(decoder.stats().length_mismatches == 0);
   }
 
   TEST_MAIN_RETURN();

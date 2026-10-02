@@ -261,8 +261,6 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   }
 
   this->publish_diag_uint(::atlantic_v5::ENT_UNKNOWN_FRAMES, dec_stats->unknown_headers);
-  this->publish_diag_uint(::atlantic_v5::ENT_LENGTH_MISMATCHES, dec_stats->length_mismatches);
-  this->publish_diag_uint(::atlantic_v5::ENT_TEXT_LENGTH_VARIANTS, dec_stats->text_length_variants);
   this->publish_diag_uint(::atlantic_v5::ENT_FRAMES_RELAYED, frames_relayed);
   this->publish_diag_uint(::atlantic_v5::ENT_REWRITES_APPLIED, rewrites_applied);
   this->publish_diag_uint(::atlantic_v5::ENT_QUEUE_OVERFLOWS, queue_overflows);
@@ -274,24 +272,6 @@ void AtlanticV5Component::update_diagnostics(uint32_t now_us) {
   // window since the previous diagnostics tick, not the time since boot.
   if (this->mode_ == Mode::MITM)
     this->relay_task_->reset_latency_stats();
-
-  // Payload-length anomalies. The counters above are the durable
-  // record; this names the offending header so a divergent firmware produces an
-  // actionable bug report rather than a number nobody can interpret. Keyed on
-  // the header, so a firmware that disagrees on one field logs once and not
-  // once per poll. Logged here, never from the decoder - L1 does not log.
-  if (dec_stats->last_length_anomaly_header != this->last_logged_anomaly_header_ &&
-      now_us - this->last_length_anomaly_us_ >= 10'000'000) {
-    this->last_logged_anomaly_header_ = dec_stats->last_length_anomaly_header;
-    this->last_length_anomaly_us_ = now_us;
-    char hex[::atlantic_v5::HEADER_LEN * 2 + 1];
-    format_header_hex(dec_stats->last_length_anomaly_header, hex);
-    ESP_LOGW(TAG,
-             "payload length anomaly on header %s: catalogue expects %u, frame offers %u "
-             "(rejected %" PRIu32 ", published with unexpected width %" PRIu32 ")",
-             hex, dec_stats->last_length_anomaly_expected, dec_stats->last_length_anomaly_actual,
-             dec_stats->length_mismatches, dec_stats->text_length_variants);
-  }
 
   // last_unknown_frame: rate-limited to once/10s, and only when a
   // *new* unknown header has actually appeared since the last time we looked.

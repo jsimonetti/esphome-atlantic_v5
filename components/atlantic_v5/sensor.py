@@ -89,8 +89,6 @@ SENSORS = {
     "crc_errors_main": ("ENT_CRC_ERRORS_MAIN", _count_schema()),
     "dropped_bytes_main": ("ENT_DROPPED_BYTES_MAIN", _count_schema()),
     "unknown_frames": ("ENT_UNKNOWN_FRAMES", _count_schema()),
-    "length_mismatches": ("ENT_LENGTH_MISMATCHES", _count_schema()),
-    "text_length_variants": ("ENT_TEXT_LENGTH_VARIANTS", _count_schema()),
     # mitm-only; stay at 0 in listener mode (no Relay/RelayTask there).
     "frames_relayed": ("ENT_FRAMES_RELAYED", _count_schema()),
     "rewrites_applied": ("ENT_REWRITES_APPLIED", _count_schema()),

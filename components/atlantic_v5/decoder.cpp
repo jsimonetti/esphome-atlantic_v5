@@ -97,26 +97,14 @@ uint8_t usable_payload_len(const Frame &f) {
 }  // namespace
 
 // A known header with no payload is the request/ack side of a READ/WRITE
-// transaction, not an anomaly: nothing to decode, nothing to count.
-// Only a payload that's present but the wrong size is a counted mismatch.
+// transaction, not an anomaly: nothing to decode, nothing to reject.
 bool Decoder::check_length(const Frame &f, uint8_t expected) const {
   if (!f.has_payload())
     return false;
   // The catalogued length must both be declared and actually be present: a
   // fixed-offset codec reading past what the frame carried would publish
   // uninitialised buffer contents as a measurement.
-  if (f.payload_len() != expected || f.buffered_payload_len() < expected) {
-    stats_.length_mismatches++;
-    record_length_anomaly(f, expected, usable_payload_len(f));
-    return false;
-  }
-  return true;
-}
-
-void Decoder::record_length_anomaly(const Frame &f, uint8_t expected, uint8_t actual) const {
-  stats_.last_length_anomaly_header = f.header_key();
-  stats_.last_length_anomaly_expected = expected;
-  stats_.last_length_anomaly_actual = actual;
+  return f.payload_len() == expected && f.buffered_payload_len() >= expected;
 }
 
 // The identity text fields are fixed-width and NUL-padded, and the
@@ -125,38 +113,24 @@ void Decoder::record_length_anomaly(const Frame &f, uint8_t expected, uint8_t ac
 // buffered, and a string too long for DecodedValue::text (which decode_text
 // would otherwise silently clip) - and let decode_text's trailing-NUL check be
 // the real structural gate. A width that merely disagrees with the catalogue is
-// published and counted separately, so a divergent firmware reports itself
-// instead of disappearing.
-bool Decoder::check_text_length(const Frame &f, uint8_t expected, uint8_t *len_out) const {
+// published.
+bool Decoder::check_text_length(const Frame &f, uint8_t *len_out) const {
   if (!f.has_payload())
     return false;
   uint8_t declared = f.payload_len();
-  if (declared > f.buffered_payload_len() || declared > sizeof(DecodedValue::text) - 1) {
-    stats_.length_mismatches++;
-    record_length_anomaly(f, expected, usable_payload_len(f));
+  if (declared > f.buffered_payload_len() || declared > sizeof(DecodedValue::text) - 1)
     return false;
-  }
   *len_out = declared;
   return true;
 }
 
-void Decoder::emit_text_field(const Frame &f, Sink sink, void *ctx, uint16_t id, uint8_t expected) const {
+void Decoder::emit_text_field(const Frame &f, Sink sink, void *ctx, uint16_t id) const {
   uint8_t len = 0;
-  if (!check_text_length(f, expected, &len))
+  if (!check_text_length(f, &len))
     return;
   char text[sizeof(DecodedValue::text)];
-  if (!codec::decode_text(f.payload(), len, text, sizeof(text))) {
-    stats_.length_mismatches++;  // no trailing NUL: structurally invalid, never published
-    record_length_anomaly(f, expected, len);
-    return;
-  }
-  // Counted only once the value is genuinely published: "accepted despite
-  // disagreeing with the catalogue" has to stay a different fact from a
-  // rejection, or neither counter means anything.
-  if (len != expected) {
-    stats_.text_length_variants++;
-    record_length_anomaly(f, expected, len);
-  }
+  if (!codec::decode_text(f.payload(), len, text, sizeof(text)))
+    return;  // no trailing NUL: structurally invalid, never published
   emit_text(sink, ctx, id, text);
 }
 
@@ -195,16 +169,16 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
 
   switch (f.header_key()) {
     case header::FIRMWARE_VERSION:
-      emit_text_field(f, sink, ctx, ENT_FIRMWARE_VERSION, 17);
+      emit_text_field(f, sink, ctx, ENT_FIRMWARE_VERSION);
       break;
     case header::SERIAL_NUMBER:
-      emit_text_field(f, sink, ctx, ENT_SERIAL_NUMBER, 16);
+      emit_text_field(f, sink, ctx, ENT_SERIAL_NUMBER);
       break;
     case header::POWER_BOARD_VERSION:
-      emit_text_field(f, sink, ctx, ENT_POWER_BOARD_VERSION, 17);
+      emit_text_field(f, sink, ctx, ENT_POWER_BOARD_VERSION);
       break;
     case header::CONTROLLER_MODEL:
-      emit_text_field(f, sink, ctx, ENT_CONTROLLER_MODEL, 13);
+      emit_text_field(f, sink, ctx, ENT_CONTROLLER_MODEL);
       break;
     case header::SETPOINT: {
       if (!check_length(f, 2))
@@ -267,10 +241,10 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
       break;
     }
     case header::HMI_VERSION:
-      emit_text_field(f, sink, ctx, ENT_HMI_VERSION, 17);
+      emit_text_field(f, sink, ctx, ENT_HMI_VERSION);
       break;
     case header::HMI_MODEL:
-      emit_text_field(f, sink, ctx, ENT_HMI_MODEL, 13);
+      emit_text_field(f, sink, ctx, ENT_HMI_MODEL);
       break;
     default:
       if (is_unmapped_header(f.header_key()))

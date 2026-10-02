@@ -379,8 +379,6 @@ sensor:
     dropped_bytes_main: {name: DHW dropped bytes MAIN}
     # both modes:
     unknown_frames: {name: DHW unknown frames}
-    length_mismatches: {name: DHW length mismatches}
-    text_length_variants: {name: DHW text length variants}
     # mitm-only (stay at 0 in listener mode):
     frames_relayed: {name: DHW frames relayed}
     rewrites_applied: {name: DHW rewrites applied}
@@ -444,18 +442,6 @@ are not reported anywhere, so a healthy bus leaves `unknown_frames` at 0.
 `log_raw_frames` switch on, the frame's payload hex is appended after a
 space (e.g. `0164DEAD01 BEEF`).
 
-`length_mismatches` counts frames whose payload was rejected as structurally
-unusable — a length byte disagreeing with a fixed-offset codec's width, a
-length claiming more bytes than the frame carried, or a text field with no
-terminating NUL. Nothing is published for those frames.
-`text_length_variants` counts the opposite case: an identity text field
-(version/serial/model) whose width differs from
-[`docs/protocol.md`](docs/protocol.md)'s catalogue but which was otherwise
-valid, so its value *was* published. A non-zero value there means your
-firmware revision disagrees with the catalogue and is worth reporting; both
-counters also emit a rate-limited warning log naming the header and the two
-lengths.
-
 ### `log_raw_frames` vs `bus_capture`
 
 These solve two different problems and are easy to confuse:
@@ -463,9 +449,9 @@ These solve two different problems and are easy to confuse:
 - **`bus_capture`** (`atlantic_v5: { bus_capture: true }`) is raw,
   *pre-assembly* byte+timestamp logging, meant for harvesting
   `test/captures/*.csv` fixtures from your own hardware. It logs
-  `BUSCAP,<t_us>,<channel>,<hex>` lines under the `atlantic_v5.bus_capture`
-  logger tag — see `test/captures/README.md` for the converter script that
-  turns those log lines into a canonical capture file.
+  `BUSCAP,<t_us>,<channel>,<hex>` lines at `DEBUG` level under the
+  `atlantic_v5.bus_capture` logger tag — see `test/captures/README.md` for the
+  converter script that turns those log lines into a canonical capture file.
 - **`log_raw_frames`** (the switch above) is post-assembly, post-CRC-check hex
   logging of already-framed frames, for live debugging of a specific header
   you're trying to understand. It writes a `frame <channel> <hex>` line at

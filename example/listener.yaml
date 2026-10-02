@@ -87,10 +87,6 @@ sensor:
       name: DHW dropped bytes
     unknown_frames:
       name: DHW unknown frames
-    length_mismatches:
-      name: DHW length mismatches
-    text_length_variants:
-      name: DHW text length variants
 
 binary_sensor:
   - platform: atlantic_v5

@@ -110,10 +110,6 @@ sensor:
       name: DHW dropped bytes MAIN
     unknown_frames:
       name: DHW unknown frames
-    length_mismatches:
-      name: DHW length mismatches
-    text_length_variants:
-      name: DHW text length variants
     frames_relayed:
       name: DHW frames relayed
     rewrites_applied:

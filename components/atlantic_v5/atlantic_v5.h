@@ -145,8 +145,6 @@ class AtlanticV5Component : public Component {
   uint32_t last_diag_us_{0};
   uint32_t last_unknown_frame_us_{0};
   uint32_t last_unknown_headers_seen_{0};
-  uint32_t last_length_anomaly_us_{0};
-  uint64_t last_logged_anomaly_header_{0};
 #endif
   Mode mode_{Mode::LISTENER};
   bool bus_capture_{false};

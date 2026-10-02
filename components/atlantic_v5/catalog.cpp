@@ -54,8 +54,6 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "crc_errors_main",
     "dropped_bytes_main",
     "unknown_frames",
-    "length_mismatches",
-    "text_length_variants",
     "frames_relayed",
     "rewrites_applied",
     "queue_overflows",
@@ -71,18 +69,32 @@ const char *entity_name(EntityId id) {
   return id < ENT_COUNT ? NAMES[id] : "unknown";
 }
 
-bool is_unmapped_header(uint64_t key) {
-  size_t lo = 0, hi = header::UNMAPPED_COUNT;
+namespace {
+bool contains(const uint64_t *keys, size_t n, uint64_t key) {
+  size_t lo = 0, hi = n;
   while (lo < hi) {
     size_t mid = lo + (hi - lo) / 2;
-    if (header::UNMAPPED[mid] == key)
+    if (keys[mid] == key)
       return true;
-    if (header::UNMAPPED[mid] < key)
+    if (keys[mid] < key)
       lo = mid + 1;
     else
       hi = mid;
   }
   return false;
+}
+}  // namespace
+
+HeaderClass classify_header(uint64_t key) {
+  if (contains(header::MAPPED, header::MAPPED_COUNT, key))
+    return HeaderClass::MAPPED;
+  if (contains(header::UNMAPPED, header::UNMAPPED_COUNT, key))
+    return HeaderClass::UNMAPPED;
+  return HeaderClass::UNKNOWN;
+}
+
+bool is_unmapped_header(uint64_t key) {
+  return classify_header(key) == HeaderClass::UNMAPPED;
 }
 
 }  // namespace atlantic_v5

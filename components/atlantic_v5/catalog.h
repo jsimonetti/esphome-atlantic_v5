@@ -69,11 +69,6 @@ enum EntityId : uint16_t {
   ENT_CRC_ERRORS_MAIN,
   ENT_DROPPED_BYTES_MAIN,
   ENT_UNKNOWN_FRAMES,
-  // Decoder payload-validation counters: frames rejected as
-  // structurally invalid, and text fields published despite a width this
-  // catalogue does not describe.
-  ENT_LENGTH_MISMATCHES,
-  ENT_TEXT_LENGTH_VARIANTS,
   ENT_FRAMES_RELAYED,
   ENT_REWRITES_APPLIED,
   ENT_QUEUE_OVERFLOWS,
@@ -115,8 +110,9 @@ constexpr uint64_t HMI_VERSION = 0x0165000301ULL;
 constexpr uint64_t HMI_MODEL = 0x0165000A01ULL;
 
 // Every mapped key above, ascending. Kept as a plain key array (rather than
-// only as named constants) so the disjointness assert below has a walkable
-// list. Not read by decode(), which dispatches on its own switch.
+// only as named constants) so classify_header can binary-search it and the
+// disjointness assert below has a walkable list. Not read by decode(), which
+// dispatches on its own switch.
 constexpr uint64_t MAPPED[] = {
     FIRMWARE_VERSION,
     SERIAL_NUMBER,
@@ -145,7 +141,7 @@ constexpr size_t MAPPED_COUNT = sizeof(MAPPED) / sizeof(MAPPED[0]);
 // docs/protocol.md "Unmapped messages": headers that are known, expected,
 // routine traffic whose meaning has not been established, plus the two
 // payload-less init headers listed under that table. Ascending, so
-// is_unmapped_header can binary-search it.
+// classify_header can binary-search it.
 constexpr uint64_t UNMAPPED[] = {
     0x0164006501ULL, 0x0164007001ULL, 0x0164007101ULL, 0x0164007501ULL, 0x01640165FEULL, 0x0164152A01ULL,
     0x0164158301ULL, 0x016421B601ULL, 0x016443130DULL, 0x0164FDED01ULL, 0x0164FDFA01ULL, 0x0164FDFD01ULL,
@@ -176,6 +172,15 @@ static_assert(detail::ascending(UNMAPPED, UNMAPPED_COUNT), "header::UNMAPPED mus
 static_assert(detail::disjoint(MAPPED, MAPPED_COUNT, UNMAPPED, UNMAPPED_COUNT),
               "a header key cannot be both mapped and unmapped");
 }  // namespace header
+
+// Where a header key sits in the message catalogue (CONTEXT.md).
+enum class HeaderClass : uint8_t {
+  MAPPED,    // known meaning, derives entities
+  UNMAPPED,  // known, expected traffic with no established meaning
+  UNKNOWN,   // absent from the catalogue entirely
+};
+
+HeaderClass classify_header(uint64_t key);
 
 // True for a header key in header::UNMAPPED: known, expected traffic with no
 // established meaning. A frame whose key is in neither table is an *unknown*
