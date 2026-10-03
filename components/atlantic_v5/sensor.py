@@ -3,9 +3,11 @@ from esphome import final_validate
 from esphome.components import sensor
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_DISABLED_BY_DEFAULT,
     DEVICE_CLASS_TEMPERATURE,
     ENTITY_CATEGORY_DIAGNOSTIC,
     STATE_CLASS_MEASUREMENT,
+    UNIT_BYTES,
     UNIT_CELSIUS,
 )
 
@@ -37,12 +39,17 @@ def _count_schema():
     return sensor.sensor_schema(accuracy_decimals=0, entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
 
 
-def _us_schema():
+def _debug_schema(unit):
+    # Instrumentation of this bridge, not of the appliance: opt-in. The unit is
+    # what keeps it out of Home Assistant's logbook, which logs every change of a
+    # sensor carrying no unit, no state_class and no numeric device_class - and
+    # these tick at 1 Hz. Any non-empty string does; without a device_class HA
+    # neither validates nor converts it.
     return sensor.sensor_schema(
-        unit_of_measurement="us",
+        unit_of_measurement=unit,
         accuracy_decimals=0,
         entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
-    )
+    ).extend({cv.Optional(CONF_DISABLED_BY_DEFAULT, default=True, visibility=cv.Visibility.ADVANCED): cv.boolean})
 
 
 # key (also the message catalogue's Entity name, docs/protocol.md) -> (EntityId enum
@@ -79,23 +86,23 @@ SENSORS = {
     # that means anything depends on the mode: listener taps a single wire and
     # uses the unsuffixed keys, mitm sits between two and publishes each side
     # separately. _final_validate rejects the wrong set for the mode.
-    "valid_frames": ("ENT_VALID_FRAMES", _count_schema()),
-    "crc_errors": ("ENT_CRC_ERRORS", _count_schema()),
-    "dropped_bytes": ("ENT_DROPPED_BYTES", _count_schema()),
-    "valid_frames_hmi": ("ENT_VALID_FRAMES_HMI", _count_schema()),
-    "crc_errors_hmi": ("ENT_CRC_ERRORS_HMI", _count_schema()),
-    "dropped_bytes_hmi": ("ENT_DROPPED_BYTES_HMI", _count_schema()),
-    "valid_frames_main": ("ENT_VALID_FRAMES_MAIN", _count_schema()),
-    "crc_errors_main": ("ENT_CRC_ERRORS_MAIN", _count_schema()),
-    "dropped_bytes_main": ("ENT_DROPPED_BYTES_MAIN", _count_schema()),
-    "unknown_frames": ("ENT_UNKNOWN_FRAMES", _count_schema()),
+    "valid_frames": ("ENT_VALID_FRAMES", _debug_schema("frames")),
+    "crc_errors": ("ENT_CRC_ERRORS", _debug_schema("errors")),
+    "dropped_bytes": ("ENT_DROPPED_BYTES", _debug_schema(UNIT_BYTES)),
+    "valid_frames_hmi": ("ENT_VALID_FRAMES_HMI", _debug_schema("frames")),
+    "crc_errors_hmi": ("ENT_CRC_ERRORS_HMI", _debug_schema("errors")),
+    "dropped_bytes_hmi": ("ENT_DROPPED_BYTES_HMI", _debug_schema(UNIT_BYTES)),
+    "valid_frames_main": ("ENT_VALID_FRAMES_MAIN", _debug_schema("frames")),
+    "crc_errors_main": ("ENT_CRC_ERRORS_MAIN", _debug_schema("errors")),
+    "dropped_bytes_main": ("ENT_DROPPED_BYTES_MAIN", _debug_schema(UNIT_BYTES)),
+    "unknown_frames": ("ENT_UNKNOWN_FRAMES", _debug_schema("frames")),
     # mitm-only; stay at 0 in listener mode (no Relay/RelayTask there).
-    "frames_relayed": ("ENT_FRAMES_RELAYED", _count_schema()),
-    "rewrites_applied": ("ENT_REWRITES_APPLIED", _count_schema()),
-    "queue_overflows": ("ENT_QUEUE_OVERFLOWS", _count_schema()),
-    "relay_latency_max_us": ("ENT_RELAY_LATENCY_MAX_US", _us_schema()),
-    "relay_latency_avg_us": ("ENT_RELAY_LATENCY_AVG_US", _us_schema()),
-    "task_stack_free": ("ENT_TASK_STACK_FREE", _count_schema()),
+    "frames_relayed": ("ENT_FRAMES_RELAYED", _debug_schema("frames")),
+    "rewrites_applied": ("ENT_REWRITES_APPLIED", _debug_schema("rewrites")),
+    "queue_overflows": ("ENT_QUEUE_OVERFLOWS", _debug_schema("overflows")),
+    "relay_latency_max_us": ("ENT_RELAY_LATENCY_MAX_US", _debug_schema("\u03bcs")),
+    "relay_latency_avg_us": ("ENT_RELAY_LATENCY_AVG_US", _debug_schema("\u03bcs")),
+    "task_stack_free": ("ENT_TASK_STACK_FREE", _debug_schema(UNIT_BYTES)),
 }
 
 CONFIG_SCHEMA = cv.Schema(

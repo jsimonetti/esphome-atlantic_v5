@@ -133,7 +133,7 @@ binary_sensor:
     connected:
       name: Connected
     heating_active:
-      name: Heating
+      name: Heatpump
     heating_element_active:
       name: Heating element
     input_i1:
