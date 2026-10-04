@@ -12,9 +12,8 @@ esp32:
 logger:
 
 external_components:
-  - source:
-      type: local
-      path: ../components
+  - source: github://jsimonetti/esphome-atlantic_v5@v0.1
+    components: [atlantic_v5]
 
 atlantic_v5:
   id: dhw
@@ -98,7 +97,7 @@ binary_sensor:
     connected:
       name: Connected
     heating_active:
-      name: Heatpump
+      name: Heating compressor
     heating_element_active:
       name: Heating element
     input_i1:

@@ -46,7 +46,7 @@ is called out explicitly in "Hardware-only acceptance" below.
 
 ```yaml
 external_components:
-  - source: github://jsimonetti/esphome-atlantic_v5
+  - source: github://jsimonetti/esphome-atlantic_v5@v0.1
     components: [atlantic_v5]
 ```
 
