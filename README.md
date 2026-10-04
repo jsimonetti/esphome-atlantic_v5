@@ -37,10 +37,10 @@ hardware, and the confidence that MITM on this bus works at all.
 ## Status
 
 Core decode, listener mode, MITM relay + rewrite, and diagnostics are all
-implemented and covered by the host test suite (`ctest`, see below) and by
-capture replay against real and synthetic bus traffic. What's *not* verified
-here — because it genuinely can't be without a devkit wired to a live bus —
-is called out explicitly in "Hardware-only acceptance" below.
+implemented, covered by the host test suite (`ctest`, see below) and by
+capture replay against real and synthetic bus traffic, and run on
+revision-2.0 hardware against a live bus. What's left is called out
+explicitly in "Hardware-only acceptance" below.
 
 ## Installation
 
