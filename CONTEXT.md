@@ -58,6 +58,10 @@ _Avoid_: writable entity
 **Read-only entity**:
 An entity that only ever receives `publish_state()` from the hub and never writes back into runtime state (sensor, binary_sensor, text_sensor).
 
+**Init-cadence entity**:
+A Read-only entity derived solely from a header the message catalogue marks cadence `init` — stated once during the HMI's initialisation burst and never repeated. The seven identity strings and the two setpoint bounds; [ADR 0003](docs/adr/0003-init-cadence-values-retained-in-volatile-ram.md) covers why they alone are carried across a software restart.
+_Avoid_: identity entity, static entity, nameplate value
+
 **RelayPolicy** / **Rewrite**:
 The only code path allowed to alter bus bytes in flight; applies solely to the input-status frame (header `0x0164FF1403`), per the control surface described in [`docs/protocol.md`](docs/protocol.md).
 
