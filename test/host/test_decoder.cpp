@@ -317,7 +317,8 @@ int main() {
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_APPLIANCE_SERIAL)->text, "SN1234567890") == 0);
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_POWER_BOARD_VERSION)->text, "1.4") == 0);
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_CONTROLLER_MODEL)->text, "V5-CTRL") == 0);
-    CHECK(find(all, atlantic_v5::ENT_SETPOINT)->f == 50.00f);
+    CHECK(find(all, atlantic_v5::ENT_SETPOINT_MIN)->f == 50.00f);
+    CHECK(find(all, atlantic_v5::ENT_SETPOINT_MAX)->f == 62.00f);
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_HMI_FIRMWARE_VERSION)->text, "3.1") == 0);
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_HMI_MODEL)->text, "HMI-STD") == 0);
 
@@ -438,9 +439,9 @@ int main() {
   }
   {
     // Scope guard: non-text codecs read fixed offsets into the payload, so
-    // their exact-length check must stay exact. setpoint expects 2 bytes.
+    // their exact-length check must stay exact. setpoint_min expects 2 bytes.
     const uint8_t payload[3] = {0x13, 0x88, 0x00};
-    atlantic_v5::Frame f = make_frame(atlantic_v5::header::SETPOINT, payload, 3);
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::SETPOINT_MIN, payload, 3);
     atlantic_v5::Decoder decoder;
     Collector c;
     decoder.decode(f, collect, &c);

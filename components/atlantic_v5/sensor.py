@@ -57,7 +57,8 @@ def _debug_schema(unit):
 # eyeball against catalog.h's EntityId; see build-and-tooling notes on keeping
 # the two in lockstep.
 SENSORS = {
-    "setpoint": ("ENT_SETPOINT", _temp_schema()),
+    "setpoint_min": ("ENT_SETPOINT_MIN", _temp_schema(True)),
+    "setpoint_max": ("ENT_SETPOINT_MAX", _temp_schema(True)),
     "water_temperature": ("ENT_WATER_TEMPERATURE", _temp_schema()),
     "compressor_outlet_temperature": ("ENT_COMPRESSOR_OUTLET_TEMPERATURE", _temp_schema()),
     "air_inlet_temperature": ("ENT_AIR_INLET_TEMPERATURE", _temp_schema()),

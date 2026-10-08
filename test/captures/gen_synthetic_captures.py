@@ -152,6 +152,9 @@ def build_single_bus_capture() -> list[Row]:
     rows.append(Row(2_150_000, "bus", payload_less_frame(bytes.fromhex("016414B701"))))
     rows.append(Row(2_153_000, "bus", payload_frame(bytes.fromhex("016414B701"), temp(5000))))
 
+    rows.append(Row(2_170_000, "bus", payload_less_frame(bytes.fromhex("0164158301"))))
+    rows.append(Row(2_173_000, "bus", payload_frame(bytes.fromhex("0164158301"), temp(6200))))
+
     # HMI-origin writes (2.7 "H"): HMI sends header+payload, MAIN acks payload-less.
     rows.append(Row(2_200_000, "bus", payload_frame(bytes.fromhex("0165000301"), text("3.1", 17))))
     rows.append(Row(2_203_000, "bus", payload_less_frame(bytes.fromhex("0165000301"))))
@@ -203,7 +206,6 @@ def build_unmapped_only_capture() -> list[Row]:
         ("0164007101", "0315"),
         ("0164007501", "02"),
         ("0164152A01", "0006"),
-        ("0164158301", "1838"),
         ("016421B601", "0000"),
         ("0164FDED01", "00"),
         ("0164FDEE01", "00"),

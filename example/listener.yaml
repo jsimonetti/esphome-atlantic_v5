@@ -46,8 +46,10 @@ sensor:
       name: Evaporator 2 temperature
     evaporator_3_temperature:
       name: Evaporator 3 temperature
-    setpoint:
-      name: Setpoint
+    setpoint_min:
+      name: Setpoint min
+    setpoint_max:
+      name: Setpoint max
     water_temperature_min:
       name: Water temperature min
     water_temperature_max:

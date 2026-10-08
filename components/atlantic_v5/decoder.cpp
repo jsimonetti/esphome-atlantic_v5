@@ -165,10 +165,16 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
     case header::CONTROLLER_MODEL:
       emit_text_field(f, sink, ctx, ENT_CONTROLLER_MODEL);
       break;
-    case header::SETPOINT: {
+    case header::SETPOINT_MIN: {
       if (!check_length(f, 2))
         break;
-      emit_float(sink, ctx, ENT_SETPOINT, codec::decode_temp(p));
+      emit_float(sink, ctx, ENT_SETPOINT_MIN, codec::decode_temp(p));
+      break;
+    }
+    case header::SETPOINT_MAX: {
+      if (!check_length(f, 2))
+        break;
+      emit_float(sink, ctx, ENT_SETPOINT_MAX, codec::decode_temp(p));
       break;
     }
     case header::TEMPERATURES: {

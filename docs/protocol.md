@@ -79,9 +79,10 @@ timestamps relative to that file:
 
 A warm re-init may still differ from a cold power-up, and this is one appliance
 and one blackout. One guess in an earlier version of this document is
-contradicted by it: `SETPOINT` (`0x016414B701`) is not something the HMI pushes,
-it is a **read** — the HMI requests it and MAIN answers (`1388` = 50.00 °C), on
-the same footing as the version and model fields around it.
+contradicted by it: `0x016414B701` is not something the HMI pushes, it is a
+**read** — the HMI requests it and MAIN answers (`1388` = 50.00 °C), on the
+same footing as the version and model fields around it. It is also not the
+user's setpoint; see *Setpoint bounds* below.
 
 This yields the channel-attribution rule that drives frame assembly:
 
@@ -260,7 +261,8 @@ Headers with an established meaning.
 | `0x0164006601` | M | init | 16 | text | serial number — the appliance's, see *Identifiers* |
 | `0x0164006701` | M | init | 17 | text | power board version |
 | `0x0164006E01` | M | init | 13 | text | controller model — *assumed, see below* |
-| `0x016414B701` | M | init | 2 | temp | setpoint |
+| `0x016414B701` | M | init | 2 | temp | lowest setpoint the HMI will let the user dial — *assumed, see below* |
+| `0x0164158301` | M | init | 2 | temp | highest setpoint the HMI will let the user dial — *assumed, see below* |
 | `0x0164FEB006` | M | 1 s | 12 | 6 × temp | water, compressor outlet, air inlet, evaporator 1, 2, 3 |
 | `0x0164FEBA03` | M | 1 s | 5 | minmax | water temperature min / max |
 | `0x0164FEBD03` | M | 1 s | 5 | minmax | compressor outlet temperature min / max |
@@ -295,7 +297,73 @@ appliance as evidence against the mapping, not as a fault.
 |---|---|---|---|
 | `0x0164006E01` | `controller_model` | **none.** The name is inherited from earlier reverse engineering and has never been checked. The value is a `600U` + 8-digit string; whether that is a model or a serial, and which subassembly it belongs to, are both open — see *Identifiers* | a label on the MAIN board, or a second appliance: identical values ⇒ model, different ⇒ serial |
 | `0x0165000A01` | `hmi_model` | **none**, exactly as above. Note the HMI puts this on the wire, but that does not make it the HMI's own attribute — the panel also transmits `0x0165152301`, an appliance property | a label on the HMI panel, or the same second-appliance test |
+| `0x016414B701` | `setpoint_min` | see *Setpoint bounds* | the experiment described there |
+| `0x0164158301` | `setpoint_max` | see *Setpoint bounds* | the experiment described there |
 | `0x0165FEF701` | `heating_element_active` | three household-meter observations agree: `00` → `64` with +1200 W, `64` → `00` with the ~1700 W drop, and a 9-minute run that never left `00` and never passed ~500 W. Origin `H`, so a command rather than a report | a second appliance, or per-circuit metering. Also unresolved: the wire value is `00` or `64` (= 100) and has never been seen at another non-zero value, so a modulating element would show this should be a percentage, not a bool |
+
+### Setpoint bounds
+
+`0x016414B701` was catalogued as `setpoint` — the tank target temperature —
+from the start, on nothing but the name inherited from earlier reverse
+engineering. Two pieces of evidence now say it is the **low end of the range
+the user may dial**, with `0x0164158301` as the high end, and that the user's
+actual setpoint is not on the bus at all. Both are circumstantial; neither is
+the direct test.
+
+**The cloud API splits the same three numbers the same way.** A Cozytouch
+capability dump for this exact appliance (`modelId` 1641, `longName`
+`TD 200 VS ATE 1200M TYB V5S`) carries 50.0, 62.0 and 55.0 in separate slots.
+The community `gduteil/cozytouch` integration wires the water-heater target
+temperature to its bounds explicitly:
+
+```python
+_DHW_USER_TARGET_BOUNDS = {
+    "lowestValueCapabilityId": 253,
+    "highestValueCapabilityId": 252,
+    "step": 1,
+}
+```
+
+and in that dump capability 253 (`target_temperature_min`) is 50.0, capability
+252 (`target_temperature_max`) is 62.0, and the target itself (22 / 231) is
+55.0. The two bounds are stamped at pairing time and never move; the target
+carries a recent timestamp. 50 and 62 each appear in two further slots
+(`dhw_lowest_water_setpoint` / `water_temperature_limit`), 55 in none.
+
+**The bus delivers the two as an adjacent pair, once, at init.**
+`real_dual_bus_link_blackout.csv` has them 23 ms apart in the same round, both
+MAIN-origin 2-byte `temp` answers, immediately before two more fixed nameplate
+facts:
+
+```
+0164158301 -> 1838 = 62.00     highest
+016414B701 -> 1388 = 50.00     lowest
+0164FFDC01 -> 04B0 = 1200      element watts?
+0165152301 -> 00C8 = 200       tank litres
+```
+
+That cadence and origin are wrong for a user setpoint and right for a bound:
+the dial lives on the HMI panel, so a setpoint the user changed would travel
+H→M as a `0x65` write, which nothing in any capture does. MAIN stating the
+permitted range once per init, after which the panel constrains the dial
+locally, explains every property of these two frames.
+
+The parameter IDs are `0x14B7` (5303) and `0x1583` (5507), *not* adjacent in
+register space — the pairing above is the HMI's polling order, not a
+contiguous block. This also withdraws the earlier reading of `0x0164158301`
+as the anti-legionella setpoint: 62 is the ceiling of the user range.
+
+**What would settle it, and what it costs:** set the panel to a value that is
+neither 50 nor 62, power-cycle the HMI to force the init burst, and read both
+headers. Unchanged ⇒ bounds, and this section becomes fact. Moved ⇒
+`0x016414B701` really is the setpoint and the catalogue reverts. One capture
+answers both headers.
+
+Confidence: moderate. One appliance, one capture, one cloud snapshot — and the
+snapshot predates the capture by ten days, so the panel's setpoint at capture
+time is not independently known. The cloud labels are `gduteil/cozytouch`'s own
+reverse engineering, exactly the same status as this document's; only the
+*values* in the dump are evidence.
 
 ### Unmapped messages
 
@@ -309,7 +377,6 @@ rewritten.
 | `0x0164007101` | M | init | 2 | `0315` |
 | `0x0164007501` | M | init | 1 | `02` |
 | `0x0164152A01` | M | init | 2 | `0006` |
-| `0x0164158301` | M | init | 2 | `1838` — decodes as 62.00 °C if it is a temperature |
 | `0x016421B601` | M | 1 s | 2 | `0000` |
 | `0x0164FDED01` | M | 1 s | 1 | `00` |
 | `0x0164FDEE01` | M | init | 1 | `00` — seen once, in the one captured initialisation burst |
@@ -339,7 +406,8 @@ appears in that capture matched it exactly.
 Payload-less headers also observed during initialisation: `0x01640165FE`,
 `0x016443130D`. Forward, count, ignore.
 
-**Observed activation sequence** (water 5 K below a 50 °C setpoint):
+**Observed activation sequence** (water around 48 °C; the panel's setpoint at
+the time was not recorded, and is not on the bus — see *Setpoint bounds*):
 
 ```
 t+0.00  0165FEFB01  64
@@ -513,7 +581,9 @@ A user with hardware can close these:
    `relay_latency_max_us`, which has been observed at 5.8 ms. Caveats: these are
    capture-flush timestamps, not wire timestamps, so they carry FIFO and
    poll-loop jitter; and one appliance recorded all of it.
-2. Does `0x0164158301` change with the anti-legionella setpoint?
+2. Which of `0x0164152A01`, `0x0164FDFA01` or another init-only field carries
+   the anti-legionella setpoint, if any does? `0x0164158301` was the candidate
+   and is no longer — see *Setpoint bounds*.
 3. Do the six cycle counters map to compressor, fan, defrost, electric element…?
    Candidate labels for cycles 1, 2, 3 and 6 are proposed in *Cycle triplet
    semantics* on the strength of one activation; only cycles 1 and 2 have

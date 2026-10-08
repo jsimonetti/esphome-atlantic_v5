@@ -46,10 +46,12 @@
 #           25. Among the new ones are all six init-only mapped headers that had
 #           never been exercised on real bytes: firmware_version (2.9),
 #           serial_number, power_board_version (1.6.1), controller_model,
-#           hmi_model, hmi_version (2.7.3), plus setpoint (0x016414B701, 50.00
-#           C). One header, 0x0164FDEE01 (payload 00, answered once during the
-#           burst), is in neither catalog.h nor docs/protocol.md - it is a first
-#           sighting and currently counts as an unknown header.
+#           hmi_model, hmi_version (2.7.3), plus the setpoint bounds
+#           (0x016414B701 = 50.00 C, 0x0164158301 = 62.00 C - see
+#           docs/protocol.md "Setpoint bounds"; both readings are assumed, not
+#           established). One header, 0x0164FDEE01 (payload 00, answered once
+#           during the burst), is in neither catalog.h nor docs/protocol.md - it
+#           is a first sighting and currently counts as an unknown header.
 # Anonymised: four text fields carrying an identifier were replaced, and the
 #           CRC recomputed, on the seven frames that carry them:
 #               0x0164006601 serial_number     -> "ANONSERIALNUMBR"

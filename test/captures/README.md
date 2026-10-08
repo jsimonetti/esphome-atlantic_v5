@@ -45,8 +45,8 @@ before the golden was frozen (the frame-by-frame working is in ticket 02), and
 every length and idle payload in that document's *Unmapped messages* table that
 occurs here matched it. The session has no init burst, so the six init-only
 headers — firmware version, serial number, power board version, controller
-model, HMI model and setpoint — are absent, as is anything that only happens
-during an activation.
+model, HMI model and the setpoint bounds — are absent, as is anything that only
+happens during an activation.
 
 `real_dual_bus_idle_polling.csv` is the same appliance in the same standby
 state, but captured in `mitm` mode with the ESP cut into the wire, so each row
@@ -89,10 +89,11 @@ contains an **initialisation burst**, and the only one that shows what the HMI
 does when its answers stop arriving. 194 chunks (97 `hmi`, 97 `main`), zero CRC
 errors, **47 distinct headers** against the 25 every other capture has.
 
-It covers the seven mapped headers that no committed capture had ever
+It covers the eight mapped headers that no committed capture had ever
 exercised on real bytes — `controller_firmware_version`, `appliance_serial`,
-`power_board_version`, `controller_model`, `hmi_model`, `hmi_firmware_version` and
-`setpoint` — so between it and the idle captures every mapped header in
+`power_board_version`, `controller_model`, `hmi_model`, `hmi_firmware_version`,
+`setpoint_min` and `setpoint_max` — so between it and the idle captures every
+mapped header in
 `catalog.h` now has real bytes behind it. It also contains the first sighting of
 `0x0164FDEE01`, which is in neither `catalog.h` nor
 [`docs/protocol.md`](../../docs/protocol.md) and so still counts as an unknown

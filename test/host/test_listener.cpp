@@ -50,19 +50,19 @@ void feed(Listener &l, const std::vector<uint8_t> &frame, uint32_t t_us) {
 }  // namespace
 
 int main() {
-  // --- A MAIN-origin payload frame (setpoint, header 0164 14B7 01, txn 0x64)
+  // --- A MAIN-origin payload frame (setpoint_min, header 0164 14B7 01, txn 0x64)
   // decodes and resets the MAIN-quiet staleness gate. ---
   {
     Listener l;
     Collector c;
     l.set_sink(collect, &c);
 
-    // setpoint = 45.50C -> 0x11C6 big endian.
+    // setpoint_min = 45.50C -> 0x11C6 big endian.
     auto frame = build_frame({0x01, 0x64, 0x14, 0xB7, 0x01, 0x02, 0x11, 0xC6});
     feed(l, frame, /*t_us=*/1'000'000);
 
-    CHECK(find(c, atlantic_v5::ENT_SETPOINT) != nullptr);
-    CHECK(find(c, atlantic_v5::ENT_SETPOINT)->f == 45.50f);
+    CHECK(find(c, atlantic_v5::ENT_SETPOINT_MIN) != nullptr);
+    CHECK(find(c, atlantic_v5::ENT_SETPOINT_MIN)->f == 45.50f);
     CHECK(l.us_since_main(1'000'000) == 0);
     CHECK(l.us_since_main(1'060'000) == 60'000);
   }

@@ -135,9 +135,9 @@
 {"t_us":16218628,"ch":"hmi","hex":"0164FE0001A6C0","key":"0164FE0001","crc":true,"values":[]}
 {"t_us":16225584,"ch":"main","hex":"0164FE00010101BBA0","key":"0164FE0001","crc":true,"values":[]}
 {"t_us":16248705,"ch":"hmi","hex":"0164158301B7C4","key":"0164158301","crc":true,"values":[]}
-{"t_us":16255398,"ch":"main","hex":"016415830102183848F4","key":"0164158301","crc":true,"values":[]}
+{"t_us":16255398,"ch":"main","hex":"016415830102183848F4","key":"0164158301","crc":true,"values":[{"id":"setpoint_max","f":62.00}]}
 {"t_us":16278770,"ch":"hmi","hex":"016414B701F0C4","key":"016414B701","crc":true,"values":[]}
-{"t_us":16286037,"ch":"main","hex":"016414B701021388FE65","key":"016414B701","crc":true,"values":[{"id":"setpoint","f":50.00}]}
+{"t_us":16286037,"ch":"main","hex":"016414B701021388FE65","key":"016414B701","crc":true,"values":[{"id":"setpoint_min","f":50.00}]}
 {"t_us":16309762,"ch":"hmi","hex":"0164FFDC01AFC0","key":"0164FFDC01","crc":true,"values":[]}
 {"t_us":16316677,"ch":"main","hex":"0164FFDC010204B0C295","key":"0164FFDC01","crc":true,"values":[]}
 {"t_us":16340685,"ch":"hmi","hex":"01651523010200C8D269","key":"0165152301","crc":true,"values":[]}

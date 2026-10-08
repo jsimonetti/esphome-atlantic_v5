@@ -398,8 +398,8 @@ told those two inputs are doing:
 ## Link blackout (MITM only): `switch: link_blackout`
 
 The HMI replays its full initialisation burst — firmware version, serial
-number, controller and HMI model, setpoint — when it loses MAIN and gets it
-back. That burst is the only time those six headers are ever sent, so without
+number, controller and HMI model, setpoint bounds — when it loses MAIN and gets
+it back. That burst is the only time those six headers are ever sent, so without
 provoking it there is no way to see them on a bus that is already running.
 This switch provokes it from the relay, so `esphome logs` is already attached
 and the capture carries per-side attribution.
@@ -435,8 +435,8 @@ the frames that were *not* forwarded are the evidence you came for.
   fail to provoke the HMI — if the first session produces no burst, try `both`
   before suspecting the code.
 - **A warm re-init is not a cold power-up.** It may omit writes a cold boot
-  carries; `SETPOINT` is the obvious candidate, being configuration the HMI
-  plausibly pushes only once.
+  carries, so a header absent from a provoked burst is not proven absent from
+  a real one.
 - This is the only feature here that deliberately degrades a live appliance.
   Run the first sessions with the tank not actively heating, and treat an
   unexpected MAIN fault state as a reason to stop rather than to retry with a
@@ -593,7 +593,9 @@ answer is hard. If you have hardware and can help close one, please do:
    has orders of magnitude of headroom. What is still unmeasured is the HMI's
    timeout for a single missed answer — see `docs/protocol.md` for the
    distribution and the caveats.
-2. Does header `0164158301` change with the anti-legionella setpoint?
+2. Are `setpoint_min` / `setpoint_max` really the ends of the user-adjustable
+   range rather than the setpoint itself? See `docs/protocol.md`, *Setpoint
+   bounds*, for the evidence and the one experiment that settles it.
 3. Do the six cycle counters (`cycle_1`..`cycle_6`) map to compressor, fan,
    defrost, electric element, and so on?
 4. Is header `0165152301` the tank volume in litres?
