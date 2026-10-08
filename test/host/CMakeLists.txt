@@ -20,7 +20,8 @@ add_library(atlantic_v5_core
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/assembler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/catalog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/decoder.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay_policy.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay_policy.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/retention.cpp)
 target_include_directories(atlantic_v5_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5)
 
@@ -69,6 +70,11 @@ target_include_directories(test_decoder PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(test_decoder PRIVATE
     CAPTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../captures")
 add_test(NAME test_decoder COMMAND test_decoder)
+
+add_executable(test_retention test_retention.cpp)
+target_link_libraries(test_retention PRIVATE atlantic_v5_core)
+target_include_directories(test_retention PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME test_retention COMMAND test_retention)
 
 add_executable(replay replay.cpp)
 target_link_libraries(replay PRIVATE replay_lib)

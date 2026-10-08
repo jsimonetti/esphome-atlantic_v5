@@ -19,6 +19,7 @@
 
 #include "bus_capture_logger.h"
 #include "relay_task.h"
+#include "retained_ram.h"
 #include "uart_bus_io.h"
 #endif
 
