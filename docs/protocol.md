@@ -42,6 +42,25 @@ Strict request/response. HMI is master.
    numbers, model identifiers and configuration values.
 4. After initialisation, HMI polls at roughly a **one-second** cadence.
 
+### Losing and regaining MAIN
+
+The HMI replays its initialisation burst when MAIN disappears and comes back.
+Established directly, by unplugging and replugging the passthrough jumper with
+the tap in `mode: listener`; `test/captures/real_single_bus_version_poll.csv`
+is the committed corroboration, four consecutive `0x0165000301` writes carrying
+`"2.7.3"` with nothing acknowledging them.
+
+While MAIN is absent, the HMI retries step one of the burst indefinitely, at
+intervals of 468, 468 and 488 ms in that capture — call it ~470 ms, on three
+intervals from one appliance. That cadence is *not* the HMI's timeout for a
+single missed answer, which no capture measures; it is what the HMI does once
+it has already concluded MAIN is gone.
+
+What the burst looks like on reconnect is not recorded here. The component can
+provoke one on demand (README, *Link blackout*), but no such capture has been
+committed, and a warm re-init may legitimately differ from a cold power-up —
+`SETPOINT` is the obvious candidate for something the HMI pushes only once.
+
 This yields the channel-attribution rule that drives frame assembly:
 
 | Channel | Byte 1 = `0x64` | Byte 1 = `0x65` |
@@ -395,7 +414,24 @@ a malformed write is a real risk to the appliance.
 
 A user with hardware can close these:
 
-1. What is MAIN's actual response deadline after an HMI request?
+1. What is MAIN's actual response deadline after an HMI request? **Partly
+   settled, as a margin rather than a deadline.** Across all five committed
+   `real_dual_bus_*.csv` captures (1499 request/answer pairs), the gap between
+   the HMI request's last byte and the start of MAIN's answer — the answer's own
+   transmit time at 38400 8N1 subtracted off — is never below 3.75 ms, with a
+   median of 4.56 ms and a maximum of 6.4 ms. Those were all recorded with the
+   MITM relay already in circuit, so the HMI tolerates at least that much. Two
+   caveats: these are capture-flush timestamps, not wire timestamps, so they
+   carry FIFO and poll-loop jitter; and one appliance recorded them. What this
+   does *not* give is the HMI's first-miss timeout. A sustained link blackout
+   only shows what the HMI does once it has decided MAIN is gone (it retries
+   step one of its initialisation burst roughly every 470 ms — three intervals
+   in `real_single_bus_version_poll.csv`, 468/468/488 ms), which could be much
+   longer than the deadline for a single missed answer. The practical question
+   "is the relay fast enough" is answered anyway: `relay_latency_max_us` is
+   reported in microseconds against a tolerance demonstrably at least 3.75 ms.
+   Measuring the first-miss timeout exactly would need a drop-exactly-N
+   variant of the blackout, which was deliberately not built.
 2. Does `0x0164158301` change with the anti-legionella setpoint?
 3. Do the six cycle counters map to compressor, fan, defrost, electric element…?
    Candidate labels for cycles 1, 2, 3 and 6 are proposed in *Cycle triplet

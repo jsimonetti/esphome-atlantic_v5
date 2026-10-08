@@ -33,6 +33,16 @@ add_library(atlantic_v5_transport
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/listener.cpp)
 target_link_libraries(atlantic_v5_transport PUBLIC atlantic_v5_core)
 
+# The link blackout is a compile-time opt-in: without ATLANTIC_V5_LINK_BLACKOUT
+# Relay has no drop path at all. Building it as a second library (rather than
+# setting the flag on atlantic_v5_transport) keeps every other test a genuine
+# control case for that gate instead of a claim about one.
+add_library(atlantic_v5_transport_blackout
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/listener.cpp)
+target_link_libraries(atlantic_v5_transport_blackout PUBLIC atlantic_v5_core)
+target_compile_definitions(atlantic_v5_transport_blackout PUBLIC ATLANTIC_V5_LINK_BLACKOUT)
+
 # Shared behind the replay CLI and test_replay_golden, so the test
 # exercises the exact code the CLI ships, not a reimplementation of it.
 add_library(replay_lib replay_lib.cpp)
@@ -76,6 +86,11 @@ target_include_directories(test_relay PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(test_relay PRIVATE
     CAPTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../captures")
 add_test(NAME test_relay COMMAND test_relay)
+
+add_executable(test_link_blackout test_link_blackout.cpp)
+target_link_libraries(test_link_blackout PRIVATE atlantic_v5_transport_blackout)
+target_include_directories(test_link_blackout PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME test_link_blackout COMMAND test_link_blackout)
 
 add_executable(test_listener test_listener.cpp)
 target_link_libraries(test_listener PRIVATE atlantic_v5_transport)

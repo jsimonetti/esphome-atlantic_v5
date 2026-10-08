@@ -72,6 +72,18 @@ class AtlanticV5Component : public Component {
   // mode - unreachable anyway, since select.py rejects control_mode there.
   void set_control_mode(::atlantic_v5::ControlMode mode);
 
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  // The link_blackout switch's write path. Compiled in only when switch.py put
+  // the entity in the config, so a build without it has no way to sever the
+  // control link at all.
+  void set_link_blackout_config(::atlantic_v5::BlackoutDirection direction, uint32_t duration_us) {
+    this->blackout_direction_ = direction;
+    this->blackout_us_ = duration_us;
+  }
+  void request_link_blackout(bool engage);
+  bool link_blackout_engaged() const;
+#endif
+
   // Frame capture: one gate per catalogue category, each logging
   // CRC-valid frames under its own tag.
   void set_frame_capture(bool mapped, bool unmapped, bool unknown) {
@@ -157,6 +169,10 @@ class AtlanticV5Component : public Component {
   int rx_pin_{-1};
   uint32_t timeout_us_{60'000'000};  // default 60s
   uint32_t frame_silence_us_{::atlantic_v5::FrameAssembler::DEFAULT_SILENCE_US};
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  ::atlantic_v5::BlackoutDirection blackout_direction_{::atlantic_v5::BlackoutDirection::MAIN_TO_HMI};
+  uint32_t blackout_us_{::atlantic_v5::DEFAULT_BLACKOUT_US};
+#endif
 
   ::atlantic_v5::Listener listener_;
   void *entities_[::atlantic_v5::ENT_COUNT]{};

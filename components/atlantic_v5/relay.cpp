@@ -13,9 +13,49 @@ Relay::Relay(BusIo &hmi_io, BusIo &main_io, RelayPolicy &policy, Config cfg)
       cfg_(cfg) {}
 
 void Relay::poll(uint32_t now_us) {
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  update_blackout(now_us);
+#endif
   service(hmi_, main_, Channel::HMI, now_us);
   service(main_, hmi_, Channel::MAIN, now_us);
 }
+
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+void Relay::update_blackout(uint32_t now_us) {
+  if (!blackout_requested_.load(std::memory_order_relaxed)) {
+    blackout_active_ = false;
+    return;
+  }
+  if (!blackout_active_) {
+    // The window starts on the relay's own clock, never on the requester's: a
+    // latch that depends on the main task, WiFi or the API to clear it can
+    // strand a live appliance with its control link severed.
+    blackout_start_us_ = now_us;
+    blackout_active_ = true;
+    return;
+  }
+  // Elapsed-since rather than a stored deadline, for the same reason as the
+  // echo window in service(): now_us wraps every ~71.6 min.
+  if (now_us - blackout_start_us_ >= cfg_.blackout_us) {
+    blackout_active_ = false;
+    blackout_requested_.store(false, std::memory_order_relaxed);
+  }
+}
+
+bool Relay::blackout_drops(Channel in_channel) const {
+  if (!blackout_active_)
+    return false;
+  switch (cfg_.blackout_direction) {
+    case BlackoutDirection::MAIN_TO_HMI:
+      return in_channel == Channel::MAIN;
+    case BlackoutDirection::HMI_TO_MAIN:
+      return in_channel == Channel::HMI;
+    case BlackoutDirection::BOTH:
+      return true;
+  }
+  return false;
+}
+#endif
 
 void Relay::service(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   uint8_t buf[MAX_FRAME];
@@ -54,6 +94,17 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
   // bad-CRC frame, so enqueueing one only costs event-queue space.
   if (!cfg_.forward_bad_crc && !f.crc_valid())
     return;
+
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  if (blackout_drops(in_channel)) {
+    // The sink still runs: the frames that were not forwarded are exactly the
+    // evidence a blackout exists to collect. Nothing is rewritten, nothing
+    // reaches the wire, and frames_relayed is not touched.
+    if (frame_sink_ != nullptr)
+      frame_sink_(frame_ctx_, in_channel, f, nullptr, now_us);
+    return;
+  }
+#endif
 
   // Snapshot the payload before the rewrite: the wire gets the rewritten frame,
   // the decoder gets what the appliance actually reported (ADR 0002).

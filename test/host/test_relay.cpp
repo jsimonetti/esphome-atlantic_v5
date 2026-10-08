@@ -1,6 +1,14 @@
 // Host test: Relay driven purely by BusIo + a mock clock — forwarding
 // decisions, the rewrite hook, echo accounting, and the silence backstop.
 // No hardware, no Decoder dependency.
+
+// This file is the control case for the link blackout's compile-time gate
+// (test_link_blackout.cpp is the other half): everything asserted below is
+// asserted about a Relay that has no drop path compiled into it at all.
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+#error "test_relay must be built without ATLANTIC_V5_LINK_BLACKOUT"
+#endif
+
 #include <cstdint>
 #include <cstring>
 #include <deque>

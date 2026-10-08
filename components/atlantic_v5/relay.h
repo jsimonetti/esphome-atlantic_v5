@@ -9,9 +9,23 @@
 #include "relay_policy.h"
 #include "types.h"
 
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+#include <atomic>
+#endif
+
 namespace atlantic_v5 {
 
 inline constexpr uint32_t DEFAULT_ECHO_DRAIN_US = 200;
+
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+// Which forwarding direction a link blackout severs. MAIN_TO_HMI is the
+// default: MAIN keeps receiving the HMI's requests and answering them, so it
+// never experiences a loss and the disturbance to a live appliance is the
+// smallest one that can still provoke the HMI.
+enum class BlackoutDirection : uint8_t { MAIN_TO_HMI, HMI_TO_MAIN, BOTH };
+
+inline constexpr uint32_t DEFAULT_BLACKOUT_US = 15'000'000;
+#endif
 
 // Declared outside Relay: a nested struct's default member initializers can't be
 // used in a default argument of the enclosing class's own constructor.
@@ -24,6 +38,10 @@ struct RelayConfig {
   // frame the far end will reject on CRC anyway is only useful if the CRC
   // failure is ours, not the sender's.
   bool forward_bad_crc = false;
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  BlackoutDirection blackout_direction = BlackoutDirection::MAIN_TO_HMI;
+  uint32_t blackout_us = DEFAULT_BLACKOUT_US;
+#endif
 };
 
 class Relay {
@@ -89,6 +107,21 @@ class Relay {
   const FrameAssembler::Stats &hmi_stats() const { return hmi_.asm_.stats(); }
   const FrameAssembler::Stats &main_stats() const { return main_.asm_.stats(); }
 
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  // Link blackout: forwarding is severed in cfg.blackout_direction for
+  // cfg.blackout_us, so the HMI loses MAIN and replays its initialisation burst
+  // when forwarding resumes. Requested and released from any thread; the window
+  // itself is latched and expired inside poll(), on the relay's own clock, so
+  // nothing outside the relay task can leave the control link cut.
+  void request_blackout() { blackout_requested_.store(true, std::memory_order_relaxed); }
+  void release_blackout() { blackout_requested_.store(false, std::memory_order_relaxed); }
+  // True from the moment a blackout is requested until it is released, by hand
+  // or by the relay's own auto-release. Deliberately not "is the cut in force
+  // right now": the cut only starts at the next poll(), and an entity mirroring
+  // this must not report "off" in that gap.
+  bool blackout_engaged() const { return blackout_requested_.load(std::memory_order_relaxed); }
+#endif
+
  private:
   struct Side {
     BusIo &io;
@@ -102,11 +135,23 @@ class Relay {
   void service(Side &in, Side &out, Channel in_channel, uint32_t now_us);
   void forward(Side &in, Side &out, Channel in_channel, uint32_t now_us);
 
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  void update_blackout(uint32_t now_us);
+  bool blackout_drops(Channel in_channel) const;
+#endif
+
   Side hmi_;
   Side main_;
   RelayPolicy &policy_;
   Config cfg_;
   Stats stats_;
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  // Only blackout_requested_ crosses threads; the other two are touched
+  // exclusively by the relay task, inside poll().
+  std::atomic<bool> blackout_requested_{false};
+  bool blackout_active_ = false;
+  uint32_t blackout_start_us_ = 0;
+#endif
   CaptureSink capture_sink_ = nullptr;
   void *capture_ctx_ = nullptr;
   FrameSink frame_sink_ = nullptr;

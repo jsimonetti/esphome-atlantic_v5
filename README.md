@@ -391,6 +391,60 @@ told those two inputs are doing:
   There is no known way to query that configuration state from the bus, so
   this component cannot detect or warn about it.
 
+## Link blackout (MITM only): `switch: link_blackout`
+
+The HMI replays its full initialisation burst — firmware version, serial
+number, controller and HMI model, setpoint — when it loses MAIN and gets it
+back. That burst is the only time those six headers are ever sent, so without
+provoking it there is no way to see them on a bus that is already running.
+This switch provokes it from the relay, so `esphome logs` is already attached
+and the capture carries per-side attribution.
+
+```yaml
+switch:
+  - platform: atlantic_v5
+    link_blackout:
+      name: Link blackout
+      direction: main_to_hmi   # or hmi_to_main, both
+      duration: 15s            # max 120s
+```
+
+While it is on, `Relay` drops forwarded frames in `direction` and writes
+nothing to the far side. The UARTs and the transceivers are untouched, so a
+blackout is electrically inert — it is a decision not to forward, nothing
+more. Framing, bus capture and frame capture all carry on, which is the point:
+the frames that were *not* forwarded are the evidence you came for.
+
+- **Compile-time opt-in.** Omit the block and the drop path is not compiled
+  into the binary at all; there is no runtime way to reach it. The component
+  only defines `ATLANTIC_V5_LINK_BLACKOUT` when this entity is configured.
+- **It releases itself, on the relay task's own clock.** Nothing on the main
+  loop, WiFi or the API is involved, so an API disconnect or a wedged main
+  loop cannot leave the control link cut. Turning the switch off early works
+  too, but it is not what makes this safe.
+- **Never restored across a reboot**; `restore_mode` is rejected.
+- **`main_to_hmi` is the default even though `both` is what was actually
+  observed to provoke the burst** (by unplugging the passthrough jumper, which
+  cuts both directions). With `main_to_hmi`, MAIN keeps receiving the HMI's
+  requests and answering them, so MAIN never experiences a loss and the
+  disturbance to a live appliance is as small as it can be. This may simply
+  fail to provoke the HMI — if the first session produces no burst, try `both`
+  before suspecting the code.
+- **A warm re-init is not a cold power-up.** It may omit writes a cold boot
+  carries; `SETPOINT` is the obvious candidate, being configuration the HMI
+  plausibly pushes only once.
+- This is the only feature here that deliberately degrades a live appliance.
+  Run the first sessions with the tank not actively heating, and treat an
+  unexpected MAIN fault state as a reason to stop rather than to retry with a
+  longer blackout.
+- Rejected at compile time in `mode: listener`: there is nothing to stop
+  forwarding in a passive tap.
+
+**A capture made this way will contain the serial number and the controller
+and HMI model strings.** No committed capture has needed anonymising so far
+only because none of them contains an init burst. Scan the hex column for runs
+of four or more printable ASCII bytes before committing one.
+
 ## Diagnostics
 
 All of the following are off by default (nothing is registered unless you add
@@ -528,8 +582,13 @@ Leave it off unless you are watching.
 These are open because they need a live unit to answer, not because the
 answer is hard. If you have hardware and can help close one, please do:
 
-1. What is MAIN's actual response deadline after an HMI request? Needed to
-   confirm the MITM relay's latency budget is conservative enough.
+1. What is MAIN's actual response deadline after an HMI request? Partly
+   settled as a *margin*: across the five committed dual-bus captures MAIN
+   never begins answering sooner than 3.75 ms after the request's last byte,
+   with the relay already in circuit, so the relay's microsecond-scale latency
+   has orders of magnitude of headroom. What is still unmeasured is the HMI's
+   timeout for a single missed answer — see `docs/protocol.md` for the
+   distribution and the caveats.
 2. Does header `0164158301` change with the anti-legionella setpoint?
 3. Do the six cycle counters (`cycle_1`..`cycle_6`) map to compressor, fan,
    defrost, electric element, and so on?

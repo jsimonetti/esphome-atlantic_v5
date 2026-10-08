@@ -160,6 +160,10 @@ void AtlanticV5Component::setup_mitm() {
   cfg.main = main_io_cfg;
   cfg.relay.silence_us = this->frame_silence_us_;
   cfg.relay.forward_bad_crc = this->forward_bad_crc_;
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  cfg.relay.blackout_direction = this->blackout_direction_;
+  cfg.relay.blackout_us = this->blackout_us_;
+#endif
   cfg.relay_core = this->relay_core_;
 
   this->relay_task_ = new ::atlantic_v5::RelayTask(cfg, this->policy_);
@@ -200,6 +204,25 @@ void AtlanticV5Component::loop_mitm() {
 }
 
 void AtlanticV5Component::set_control_mode(::atlantic_v5::ControlMode mode) { this->policy_.set_control_mode(mode); }
+
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+void AtlanticV5Component::request_link_blackout(bool engage) {
+  // Null in listener mode and before setup_mitm(); switch.py already rejects
+  // the former, so this only guards the boot window.
+  if (this->relay_task_ == nullptr)
+    return;
+  if (engage) {
+    ESP_LOGW(TAG, "link blackout engaged: forwarding severed for up to %" PRIu32 " ms", this->blackout_us_ / 1000);
+    this->relay_task_->request_blackout();
+  } else {
+    this->relay_task_->release_blackout();
+  }
+}
+
+bool AtlanticV5Component::link_blackout_engaged() const {
+  return this->relay_task_ != nullptr && this->relay_task_->blackout_engaged();
+}
+#endif
 
 void AtlanticV5Component::publish_diag_uint(uint16_t id, uint32_t value) {
   ::atlantic_v5::DecodedValue v{};

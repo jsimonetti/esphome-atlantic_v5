@@ -52,7 +52,7 @@ _Avoid_: timeout (that is the MAIN-quiet staleness gate)
 The window after a write to a Side during which bytes arriving back on that same Side are our own transceiver's echo, and are discarded rather than framed. MITM only, and not configurable: `flush_input()` after each write already removes the echo, so this is only a backstop for a byte that lands after that flush.
 
 **Controllable entity**:
-An entity whose ESPHome-side action writes into shared runtime state read by the relay task. Currently only the `select` control-mode entity, which writes into RelayPolicy.
+An entity whose ESPHome-side action writes into shared runtime state read by the relay task. Two of them: the `select` control-mode entity, which writes into RelayPolicy, and the `switch` link-blackout entity, which writes into Relay.
 _Avoid_: writable entity
 
 **Read-only entity**:
@@ -60,6 +60,10 @@ An entity that only ever receives `publish_state()` from the hub and never write
 
 **RelayPolicy** / **Rewrite**:
 The only code path allowed to alter bus bytes in flight; applies solely to the input-status frame (header `0x0164FF1403`), per the control surface described in [`docs/protocol.md`](docs/protocol.md).
+
+**Link blackout**:
+A deliberate, time-bounded suppression of frame forwarding in one or both directions, used to make the HMI believe it has lost MAIN so that it replays its initialisation burst on reconnection. Distinct from a Rewrite, which alters bytes: a blackout forwards nothing at all. An axis of its own, independent of control mode. MITM only — a passive tap forwards nothing to begin with.
+_Avoid_: disconnect, relay off (both suggest the transport is torn down; the UARTs and transceivers are untouched)
 
 **Observed input**:
 The state of the appliance's physical I1/I2 contacts, as MAIN reports it on the bus. What the input entities publish in every mode: a Rewrite never changes what they report.

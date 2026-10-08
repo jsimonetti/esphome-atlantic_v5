@@ -46,6 +46,13 @@ class RelayTask {
   const FrameAssembler::Stats &main_stats() const { return this->relay_.main_stats(); }
   void reset_latency_stats() { this->relay_.reset_latency_stats(); }
 
+#ifdef ATLANTIC_V5_LINK_BLACKOUT
+  // Called from the main loop; the window itself is timed by the relay task.
+  void request_blackout() { this->relay_.request_blackout(); }
+  void release_blackout() { this->relay_.release_blackout(); }
+  bool blackout_engaged() const { return this->relay_.blackout_engaged(); }
+#endif
+
   // High-water mark of unused stack, in bytes, for the task_stack_free
   // diagnostic. 0 before begin() spawns the task.
   uint32_t stack_high_water_mark() const {
