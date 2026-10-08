@@ -19,8 +19,9 @@ class RetentionBlock {
 
   // Bump whenever the meaning of the payload bytes changes. A block written by
   // a previous firmware is then rejected outright rather than decoded under the
-  // new meaning.
-  static constexpr uint16_t LAYOUT_VERSION = 1;
+  // new meaning. 2: the init-value encoding (init_values.h); 1 was the probe's
+  // arbitrary text.
+  static constexpr uint16_t LAYOUT_VERSION = 2;
 
   // Replaces the block's contents with payload[0..len). A len above CAPACITY is
   // refused, and leaves the block in a state load() rejects rather than a

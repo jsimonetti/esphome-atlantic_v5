@@ -449,6 +449,48 @@ and HMI model strings.** No committed capture has needed anonymising so far
 only because none of them contains an init burst. Scan the hex column for runs
 of four or more printable ASCII bytes before committing one.
 
+## Init-cadence values across a restart
+
+Nine entities — `controller_firmware_version`, `appliance_serial`,
+`product_code`, `power_board_version`, `controller_model`,
+`hmi_firmware_version`, `hmi_model`, `setpoint_min` and `setpoint_max` — are
+stated once during the HMI's initialisation burst and never repeated. An
+`esphome upload` reboots the ESP faster than the HMI notices MAIN going away,
+so the burst is not replayed and those entities would otherwise read `unknown`
+until the appliance itself is next power-cycled — potentially months.
+
+They are therefore kept in a block of uninitialised RAM that the C runtime does
+not clear, and republished at startup. There is nothing to configure and
+nothing to turn on. An observation that merely confirms a restored value
+publishes nothing, so `force_update` has no effect on `setpoint_min` /
+`setpoint_max`.
+
+- **A live decode always wins.** A restored value is a cache of a past
+  observation, never a reading. Any observation of one of these headers
+  overwrites what was retained, in both modes.
+- **It is deliberately not written to flash.** The block is volatile RAM,
+  never NVS and never `restore_value`. The one way a retained value could be
+  wrong is if the ESP was off while the appliance re-initialised, and the
+  block being lost along with the power is what is meant to rule that out — so
+  moving it to flash would remove the very thing that makes retention safe.
+  That the block really does go when the power does was observed once, on one
+  board, with the power off for ten seconds; it is not an ESP-IDF guarantee.
+  [ADR 0003](docs/adr/0003-init-cadence-values-retained-in-volatile-ram.md)
+  records exactly what was measured.
+- **Diagnostic counters and `connected` are not retained.** The counters
+  describe one boot and start from zero; `connected` keeps reflecting only the
+  live staleness gate. A populated serial number next to a disconnected state
+  is the correct picture, not a contradiction.
+- **The staleness gate does not blank them.** Every other numeric sensor is
+  published as `NAN` when MAIN goes quiet; these are not, because a dead link
+  does not make the appliance's serial or its setpoint bounds unknown.
+- **A crash loop leaves the ESP down and still holding its values**, since a
+  panic retains the block too. In `mitm` that should largely self-heal: a
+  crash-looping relay looks to the HMI much like MAIN disappearing, so the
+  burst is expected on recovery — not something that has been tried here. In
+  `listener` there is no such feedback at all, and the values stay as they
+  were until the appliance next initialises.
+
 ## Diagnostics
 
 All of the following are off by default (nothing is registered unless you add

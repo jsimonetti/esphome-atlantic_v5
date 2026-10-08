@@ -50,6 +50,8 @@ void AtlanticV5Component::setup() {
   for (float &f : this->last_published_)
     f = NAN;
 
+  this->restore_init_values();
+
   if (this->mode_ == Mode::MITM) {
     this->setup_mitm();
     return;
@@ -327,6 +329,36 @@ void AtlanticV5Component::frame_capture_trampoline(void *ctx, const ::atlantic_v
   (void) t_us;
   static_cast<AtlanticV5Component *>(ctx)->maybe_capture_frame(f);
 }
+
+void AtlanticV5Component::restore_trampoline(void *ctx, const ::atlantic_v5::DecodedValue &v) {
+  // Straight to the entity: publish() would see a value the store already
+  // holds and correctly decide there is nothing new to say.
+  static_cast<AtlanticV5Component *>(ctx)->publish_to_entity(v);
+}
+
+void AtlanticV5Component::restore_init_values() {
+  uint8_t buf[::atlantic_v5::RetentionBlock::CAPACITY];
+  uint16_t len = 0;
+  // Absent on any boot whose block this firmware did not write, which on the
+  // one power cycle ticket 01 tried included the boot after it - ADR 0003 for
+  // what that observation does and does not establish.
+  if (!::atlantic_v5::retained_block().load(buf, sizeof(buf), len))
+    return;
+  if (!this->init_values_.decode(buf, len)) {
+    ESP_LOGW(TAG, "retained init values discarded: payload is not a valid encoding");
+    return;
+  }
+  this->init_values_.each(&AtlanticV5Component::restore_trampoline, this);
+  ESP_LOGI(TAG, "restored init-cadence values from the previous run");
+}
+
+void AtlanticV5Component::persist_init_values() {
+  uint8_t buf[::atlantic_v5::InitValueStore::MAX_ENCODED];
+  const uint16_t len = this->init_values_.encode(buf, sizeof(buf));
+  if (len == 0)
+    return;
+  ::atlantic_v5::retained_block().store(buf, len);
+}
 #endif
 
 void AtlanticV5Component::set_entity(uint16_t id, void *obj, EntityKind kind) {
@@ -341,6 +373,28 @@ void AtlanticV5Component::publish_trampoline(void *ctx, const ::atlantic_v5::Dec
 }
 
 void AtlanticV5Component::publish(const ::atlantic_v5::DecodedValue &v) {
+  switch (this->init_values_.observe(v)) {
+    case ::atlantic_v5::InitValueStore::Observation::UNCHANGED:
+      // The entity already carries this value, either from a restore at boot
+      // or from an earlier burst this boot. Stopping here rather than letting
+      // publish_to_entity() dedupe is what keeps the seven text entities
+      // quiet: ESPHome's TextSensor::publish_state notifies the frontend even
+      // when the string is identical. The cost is that force_update does
+      // nothing on the two numeric bounds, which change about once per
+      // appliance power cycle and so have no freshness to keep.
+      return;
+    case ::atlantic_v5::InitValueStore::Observation::CHANGED:
+#ifdef USE_ESP32
+      this->persist_init_values();
+#endif
+      break;
+    case ::atlantic_v5::InitValueStore::Observation::NOT_INIT_CADENCE:
+      break;
+  }
+  this->publish_to_entity(v);
+}
+
+void AtlanticV5Component::publish_to_entity(const ::atlantic_v5::DecodedValue &v) {
   if (v.id >= ::atlantic_v5::ENT_COUNT)
     return;
   void *obj = this->entities_[v.id];
@@ -409,6 +463,12 @@ void AtlanticV5Component::update_staleness(uint32_t now_us) {
   this->status_set_warning("no data from MAIN");
   for (uint16_t id = 0; id < ::atlantic_v5::ENT_COUNT; id++) {
     if (this->entities_[id] == nullptr || this->kinds_[id] != EntityKind::SENSOR)
+      continue;
+    // An init-cadence value is a cache of a past observation, not a live
+    // reading (ADR 0003): losing the link does not make the appliance's
+    // setpoint bounds unknown, any more than it does its serial number - which
+    // is a text_sensor and was never blanked here to begin with.
+    if (::atlantic_v5::init_cadence_index(id) != ::atlantic_v5::INIT_CADENCE_COUNT)
       continue;
     static_cast<sensor::Sensor *>(this->entities_[id])->publish_state(NAN);
     this->has_last_published_[id] = false;

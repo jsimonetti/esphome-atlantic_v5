@@ -71,6 +71,13 @@ const char *entity_name(EntityId id) {
   return id < ENT_COUNT ? NAMES[id] : "unknown";
 }
 
+size_t init_cadence_index(uint16_t id) {
+  for (size_t i = 0; i < INIT_CADENCE_COUNT; i++)
+    if (INIT_CADENCE[i] == id)
+      return i;
+  return INIT_CADENCE_COUNT;
+}
+
 namespace {
 bool contains(const uint64_t *keys, size_t n, uint64_t key) {
   size_t lo = 0, hi = n;

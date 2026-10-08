@@ -90,6 +90,27 @@ enum EntityId : uint16_t {
 // "unknown" for anything outside [0, ENT_COUNT).
 const char *entity_name(EntityId id);
 
+// The init-cadence entities (CONTEXT.md): the ones whose only source is the
+// HMI's initialisation burst, stated once and never repeated. Seven identity
+// strings plus the two setpoint bounds. Listed in enum order, which is the
+// order they are republished in after a restart (ADR 0003).
+constexpr uint16_t INIT_CADENCE[] = {
+    ENT_CONTROLLER_FIRMWARE_VERSION,
+    ENT_APPLIANCE_SERIAL,
+    ENT_PRODUCT_CODE,
+    ENT_POWER_BOARD_VERSION,
+    ENT_CONTROLLER_MODEL,
+    ENT_SETPOINT_MIN,
+    ENT_SETPOINT_MAX,
+    ENT_HMI_FIRMWARE_VERSION,
+    ENT_HMI_MODEL,
+};
+constexpr size_t INIT_CADENCE_COUNT = sizeof(INIT_CADENCE) / sizeof(INIT_CADENCE[0]);
+
+// Position of id within INIT_CADENCE, or INIT_CADENCE_COUNT when id is not an
+// init-cadence entity.
+size_t init_cadence_index(uint16_t id);
+
 // Header keys for payload-bearing frames with known meaning.
 namespace header {
 constexpr uint64_t CONTROLLER_FIRMWARE_VERSION = 0x0164006401ULL;

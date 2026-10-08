@@ -10,6 +10,7 @@
 
 #include "catalog.h"
 #include "decoder.h"
+#include "init_values.h"
 #include "listener.h"
 #include "relay.h"
 #include "relay_policy.h"
@@ -101,6 +102,8 @@ class AtlanticV5Component : public Component {
  protected:
   static void publish_trampoline(void *ctx, const ::atlantic_v5::DecodedValue &v);
   void publish(const ::atlantic_v5::DecodedValue &v);
+  // publish() minus the init-value bookkeeping: hands v straight to its entity.
+  void publish_to_entity(const ::atlantic_v5::DecodedValue &v);
   void update_staleness(uint32_t now_us);
   uint32_t us_since_main(uint32_t now_us) const;
   // Whether a payload-bearing MAIN frame has been seen at all since boot. Until
@@ -130,6 +133,13 @@ class AtlanticV5Component : public Component {
   // Listener::FrameSink in listener mode (frame_capture_trampoline).
   void maybe_capture_frame(const ::atlantic_v5::Frame &f);
   static void frame_capture_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
+
+  // Init-cadence values across a software restart (ADR 0003). restore_ reads
+  // the retained block once at setup and republishes whatever it held;
+  // persist_ writes the store back whenever a live decode changed it.
+  void restore_init_values();
+  void persist_init_values();
+  static void restore_trampoline(void *ctx, const ::atlantic_v5::DecodedValue &v);
 
   // Per-side MITM config; unused in listener mode.
   struct SideConfig {
@@ -176,6 +186,9 @@ class AtlanticV5Component : public Component {
 #endif
 
   ::atlantic_v5::Listener listener_;
+  // The nine init-cadence values as last seen, and the dedupe that keeps a
+  // restored value from being republished by the observation that confirms it.
+  ::atlantic_v5::InitValueStore init_values_;
   void *entities_[::atlantic_v5::ENT_COUNT]{};
   EntityKind kinds_[::atlantic_v5::ENT_COUNT]{};
   // Last published numeric value per entity, for the "only publish when
