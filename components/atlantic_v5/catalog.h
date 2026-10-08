@@ -14,9 +14,11 @@ namespace atlantic_v5 {
 // diagnostic counters appended at the end - not part of the wire
 // catalogue, but published through the same entity-id/publish plumbing.
 enum EntityId : uint16_t {
-  ENT_FIRMWARE_VERSION = 0,
-  ENT_SERIAL_NUMBER,
+  ENT_CONTROLLER_FIRMWARE_VERSION = 0,
+  ENT_APPLIANCE_SERIAL,
+  ENT_PRODUCT_CODE,
   ENT_POWER_BOARD_VERSION,
+  // Assumed, not established - see header::ASSUMED.
   ENT_CONTROLLER_MODEL,
   ENT_SETPOINT,
   ENT_WATER_TEMPERATURE,
@@ -52,9 +54,9 @@ enum EntityId : uint16_t {
   ENT_INPUT_I2,
   ENT_INPUT_I1,
   ENT_HEATING_ACTIVE,
-  ENT_HMI_VERSION,
-  ENT_HMI_MODEL,
+  ENT_HMI_FIRMWARE_VERSION,
   // Assumed, not established - see header::ASSUMED.
+  ENT_HMI_MODEL,
   ENT_HEATING_ELEMENT_ACTIVE,
 
   // Diagnostics, off by default. The three framing counters come in two
@@ -88,8 +90,9 @@ const char *entity_name(EntityId id);
 
 // Header keys for payload-bearing frames with known meaning.
 namespace header {
-constexpr uint64_t FIRMWARE_VERSION = 0x0164006401ULL;
-constexpr uint64_t SERIAL_NUMBER = 0x0164006601ULL;
+constexpr uint64_t CONTROLLER_FIRMWARE_VERSION = 0x0164006401ULL;
+constexpr uint64_t PRODUCT_CODE = 0x0164006501ULL;
+constexpr uint64_t APPLIANCE_SERIAL = 0x0164006601ULL;
 constexpr uint64_t POWER_BOARD_VERSION = 0x0164006701ULL;
 constexpr uint64_t CONTROLLER_MODEL = 0x0164006E01ULL;
 constexpr uint64_t SETPOINT = 0x016414B701ULL;
@@ -107,7 +110,7 @@ constexpr uint64_t CYCLE_4 = 0x0164FEEB03ULL;
 constexpr uint64_t CYCLE_5 = 0x0164FEEE03ULL;
 constexpr uint64_t CYCLE_6 = 0x0164FEF103ULL;
 constexpr uint64_t INPUT_STATUS = 0x0164FF1403ULL;
-constexpr uint64_t HMI_VERSION = 0x0165000301ULL;
+constexpr uint64_t HMI_FIRMWARE_VERSION = 0x0165000301ULL;
 constexpr uint64_t HMI_MODEL = 0x0165000A01ULL;
 constexpr uint64_t HEATING_ELEMENT = 0x0165FEF701ULL;
 
@@ -117,6 +120,8 @@ constexpr uint64_t HEATING_ELEMENT = 0x0165FEF701ULL;
 // meanings has this project actually established?" stays answerable in code.
 // Ascending, and every member must also appear in MAPPED.
 constexpr uint64_t ASSUMED[] = {
+    CONTROLLER_MODEL,
+    HMI_MODEL,
     HEATING_ELEMENT,
 };
 constexpr size_t ASSUMED_COUNT = sizeof(ASSUMED) / sizeof(ASSUMED[0]);
@@ -126,8 +131,9 @@ constexpr size_t ASSUMED_COUNT = sizeof(ASSUMED) / sizeof(ASSUMED[0]);
 // disjointness assert below has a walkable list. Not read by decode(), which
 // dispatches on its own switch.
 constexpr uint64_t MAPPED[] = {
-    FIRMWARE_VERSION,
-    SERIAL_NUMBER,
+    CONTROLLER_FIRMWARE_VERSION,
+    PRODUCT_CODE,
+    APPLIANCE_SERIAL,
     POWER_BOARD_VERSION,
     CONTROLLER_MODEL,
     SETPOINT,
@@ -145,7 +151,7 @@ constexpr uint64_t MAPPED[] = {
     CYCLE_5,
     CYCLE_6,
     INPUT_STATUS,
-    HMI_VERSION,
+    HMI_FIRMWARE_VERSION,
     HMI_MODEL,
     HEATING_ELEMENT,
 };
@@ -156,8 +162,8 @@ constexpr size_t MAPPED_COUNT = sizeof(MAPPED) / sizeof(MAPPED[0]);
 // payload-less init headers listed under that table. Ascending, so
 // classify_header can binary-search it.
 constexpr uint64_t UNMAPPED[] = {
-    0x0164006501ULL, 0x0164007001ULL, 0x0164007101ULL, 0x0164007501ULL, 0x01640165FEULL, 0x0164152A01ULL,
-    0x0164158301ULL, 0x016421B601ULL, 0x016443130DULL, 0x0164FDED01ULL, 0x0164FDFA01ULL, 0x0164FDFD01ULL,
+    0x0164007001ULL, 0x0164007101ULL, 0x0164007501ULL, 0x01640165FEULL, 0x0164152A01ULL, 0x0164158301ULL,
+    0x016421B601ULL, 0x016443130DULL, 0x0164FDED01ULL, 0x0164FDEE01ULL, 0x0164FDFA01ULL, 0x0164FDFD01ULL,
     0x0164FE0001ULL, 0x0164FED801ULL, 0x0164FFDC01ULL, 0x0165152301ULL, 0x016516B301ULL, 0x0165FDF802ULL,
     0x0165FDFB02ULL, 0x0165FDFE02ULL, 0x0165FEF901ULL, 0x0165FEFB01ULL, 0x0165FEFD01ULL, 0x0165FEFF01ULL,
     0x0165FF0101ULL, 0x0165FF0301ULL,

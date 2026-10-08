@@ -199,7 +199,6 @@ def build_unmapped_only_capture() -> list[Row]:
     a payload-less request/ack on one channel and the payload frame on the other.
     """
     unmapped = [
-        ("0164006501", "31323334353637383930313233"),  # ASCII digits
         ("0164007001", "083F"),
         ("0164007101", "0315"),
         ("0164007501", "02"),
@@ -207,6 +206,7 @@ def build_unmapped_only_capture() -> list[Row]:
         ("0164158301", "1838"),
         ("016421B601", "0000"),
         ("0164FDED01", "00"),
+        ("0164FDEE01", "00"),
         ("0164FDFA01", "05"),
         ("0164FDFD01", "00"),
         ("0164FE0001", "01"),

@@ -1,5 +1,8 @@
 substitutions:
   board: arduino_nano_esp32
+  # Overridden to ../components by CI, so the workflow validates the code in the
+  # tree rather than whatever the pinned ref happens to hold.
+  atlantic_v5_source: github://jsimonetti/esphome-atlantic_v5@v0.2
 
 esphome:
   name: atlantic-v5-mitm
@@ -12,7 +15,7 @@ esp32:
 logger:
 
 external_components:
-  - source: github://jsimonetti/esphome-atlantic_v5@v0.1
+  - source: ${atlantic_v5_source}
     components: [atlantic_v5]
 
 atlantic_v5:
@@ -154,15 +157,17 @@ binary_sensor:
 
 text_sensor:
   - platform: atlantic_v5
-    firmware_version:
+    controller_firmware_version:
       name: Firmware version
-    serial_number:
+    appliance_serial:
       name: Serial number
+    product_code:
+      name: Product code
     power_board_version:
       name: Power board version
     controller_model:
       name: Controller model
-    hmi_version:
+    hmi_firmware_version:
       name: HMI version
     hmi_model:
       name: HMI model

@@ -50,16 +50,38 @@ the tap in `mode: listener`; `test/captures/real_single_bus_version_poll.csv`
 is the committed corroboration, four consecutive `0x0165000301` writes carrying
 `"2.7.3"` with nothing acknowledging them.
 
-While MAIN is absent, the HMI retries step one of the burst indefinitely, at
-intervals of 468, 468 and 488 ms in that capture — call it ~470 ms, on three
-intervals from one appliance. That cadence is *not* the HMI's timeout for a
-single missed answer, which no capture measures; it is what the HMI does once
-it has already concluded MAIN is gone.
+`test/captures/real_dual_bus_link_blackout.csv` records the whole arc on one
+appliance, provoked with the `link_blackout` switch (README, *Link blackout*):
+15 s with MAIN → HMI forwarding severed, then the recovery. What it shows,
+timestamps relative to that file:
 
-What the burst looks like on reconnect is not recorded here. The component can
-provoke one on demand (README, *Link blackout*), but no such capture has been
-committed, and a warm re-init may legitimately differ from a cold power-up —
-`SETPOINT` is the obvious candidate for something the HMI pushes only once.
+1. **One missed answer costs ~470 ms.** The first request the HMI did not get an
+   answer to (`0x0164FEF103`, t=0.590) was repeated at t=1.060. That is the
+   HMI's timeout for a single missed answer, and it is the same ~470 ms as the
+   "MAIN is gone" cadence above — one timer, not two. Across the 23 retry
+   intervals in the file it lands between 469.4 and 469.9 ms.
+2. **Three attempts, then move on.** Each of `0x0164FEF103`, `0x0165FF0101`,
+   `0x0165FF0301`, `0x0164FF1403`, `0x016421B601`, `0x016516B301`,
+   `0x0164FDED01` and `0x0164FEB006` was tried exactly three times on that
+   cadence before the HMI went to the next header in its round. It never
+   stalled and never shortened the round.
+3. **A failed round starts the initialisation handshake.** Having run out of
+   headers the HMI sent `0x0165000A01` (HMI model) three times, then
+   `0x0165000301` (HMI version) on the same cadence *without* a three-attempt
+   limit — six attempts here, cut short only by the blackout being released. So
+   it takes a whole failed round, about 15 s on this appliance, before the HMI
+   concludes MAIN is gone.
+4. **Recovery is immediate and complete.** The first acknowledgement to get
+   through (t=15.666) was followed 34 ms later by the full burst: 22 headers
+   that occur nowhere else, at the same ~30 ms spacing as ordinary polling,
+   finished within 700 ms, after which normal polling resumed with no further
+   disturbance.
+
+A warm re-init may still differ from a cold power-up, and this is one appliance
+and one blackout. One guess in an earlier version of this document is
+contradicted by it: `SETPOINT` (`0x016414B701`) is not something the HMI pushes,
+it is a **read** — the HMI requests it and MAIN answers (`1388` = 50.00 °C), on
+the same footing as the version and model fields around it.
 
 This yields the channel-attribution rule that drives frame assembly:
 
@@ -234,9 +256,10 @@ Headers with an established meaning.
 | Header key | Origin | Cadence | Len | Codec | Meaning |
 |---|---|---|---|---|---|
 | `0x0164006401` | M | init | 17 | text | firmware version (e.g. "2.9") |
-| `0x0164006601` | M | init | 16 | text | serial number |
+| `0x0164006501` | M | init | 13 | text | product / article code — see *Identifiers* |
+| `0x0164006601` | M | init | 16 | text | serial number — the appliance's, see *Identifiers* |
 | `0x0164006701` | M | init | 17 | text | power board version |
-| `0x0164006E01` | M | init | 13 | text | controller model |
+| `0x0164006E01` | M | init | 13 | text | controller model — *assumed, see below* |
 | `0x016414B701` | M | init | 2 | temp | setpoint |
 | `0x0164FEB006` | M | 1 s | 12 | 6 × temp | water, compressor outlet, air inlet, evaporator 1, 2, 3 |
 | `0x0164FEBA03` | M | 1 s | 5 | minmax | water temperature min / max |
@@ -253,7 +276,7 @@ Headers with an established meaning.
 | `0x0164FEF103` | M | 1 s | 12 | cycle | cycle 6 active / count — possibly a start/stop transient |
 | **`0x0164FF1403`** | M | 1 s | 3 | 3 × bool | input I2, input I1, heating active — **the rewrite target** |
 | `0x0165000301` | H | init | 17 | text | HMI version |
-| `0x0165000A01` | H | init | 13 | text | HMI model |
+| `0x0165000A01` | H | init | 13 | text | HMI model — *assumed, see below* |
 | `0x0165FEF701` | H | 1 s | 1 | bool | heating element active — *assumed, see below* |
 
 The firmware version and all three evaporator min/max pairs are decoded here but
@@ -270,6 +293,8 @@ appliance as evidence against the mapping, not as a fault.
 
 | Header key | Entity | Evidence | What would settle it |
 |---|---|---|---|
+| `0x0164006E01` | `controller_model` | **none.** The name is inherited from earlier reverse engineering and has never been checked. The value is a `600U` + 8-digit string; whether that is a model or a serial, and which subassembly it belongs to, are both open — see *Identifiers* | a label on the MAIN board, or a second appliance: identical values ⇒ model, different ⇒ serial |
+| `0x0165000A01` | `hmi_model` | **none**, exactly as above. Note the HMI puts this on the wire, but that does not make it the HMI's own attribute — the panel also transmits `0x0165152301`, an appliance property | a label on the HMI panel, or the same second-appliance test |
 | `0x0165FEF701` | `heating_element_active` | three household-meter observations agree: `00` → `64` with +1200 W, `64` → `00` with the ~1700 W drop, and a 9-minute run that never left `00` and never passed ~500 W. Origin `H`, so a command rather than a report | a second appliance, or per-circuit metering. Also unresolved: the wire value is `00` or `64` (= 100) and has never been seen at another non-zero value, so a modulating element would show this should be a percentage, not a bool |
 
 ### Unmapped messages
@@ -280,7 +305,6 @@ rewritten.
 
 | Header key | Origin | Cadence | Len | Observed |
 |---|---|---|---|---|
-| `0x0164006501` | M | init | 13 | ASCII digits, possibly a second serial number |
 | `0x0164007001` | M | init | 2 | `083F` |
 | `0x0164007101` | M | init | 2 | `0315` |
 | `0x0164007501` | M | init | 1 | `02` |
@@ -288,6 +312,7 @@ rewritten.
 | `0x0164158301` | M | init | 2 | `1838` — decodes as 62.00 °C if it is a temperature |
 | `0x016421B601` | M | 1 s | 2 | `0000` |
 | `0x0164FDED01` | M | 1 s | 1 | `00` |
+| `0x0164FDEE01` | M | init | 1 | `00` — seen once, in the one captured initialisation burst |
 | `0x0164FDFA01` | M | init | 1 | `05` |
 | `0x0164FDFD01` | M | init | 1 | `00` |
 | `0x0164FE0001` | M | init | 1 | `01` |
@@ -339,6 +364,65 @@ t+8.56  0165FEFB01  00
 t+8.75  0165FF0101  0000000000
 t+8.78  0165FF0301  00
 ```
+
+### Identifiers
+
+The initialisation burst carries five identity strings. Byte 1 says who *puts
+the value on the wire*: `0x64` means MAIN supplies it, `0x65` means the HMI
+supplies it. That is mechanical — it falls out of the framing rule — but it says
+nothing about *whose attribute* the value is. The HMI also writes
+`0x0165152301`, which looks like the tank volume: an appliance property,
+transmitted by the panel. Transmitter and subject are not the same thing, so do
+not use origin to argue that a field must belong to the side that sent it.
+
+Values below are given as shapes, not as the reference unit's actual strings —
+those are personal data and are not recorded in this repository. The committed
+capture carries `ANON…` placeholders of identical length for the same reason;
+see `real_dual_bus_link_blackout.csv`.
+
+| Header key | Origin | Shape | What it is | Basis |
+|---|---|---|---|---|
+| `0x0164006601` | M | 15 digits | **appliance serial number** | the `N/S:` on the tank's rating plate, digit for digit |
+| `0x0164006501` | M | 12 digits | **model / article code**, `1000` + the plate's six-digit `Code:` + `00` | the plate. The cloud dump carries the identical 12 digits too, but see below |
+| `0x0164006E01` | M | 12 chars, `600U` + 8 digits | an identifier. Catalogued as `controller_model`; **whether it is a model or a serial, and which subassembly it belongs to, is undetermined** | nothing — the name is inherited, not established |
+| `0x0165000A01` | H | 12 chars, `600U` + 8 digits | likewise, catalogued as `hmi_model`, same two open questions | nothing |
+| `0x0164006701` | M | dotted version, e.g. `1.6.1` | power board version | inherited |
+
+So the burst contains three distinct identifier namespaces — 15 digits, `1000…00`,
+and `600U` + 8 digits — of which the first two are pinned to the rating plate and
+the third is not pinned to anything.
+
+What the two `600U…` strings are is genuinely open. Against them being models:
+the product identity is already fully covered by `0x0164006501` and the plate,
+which would make a model field redundant; the `600U` + running-number shape reads
+like a counter; and the Cozytouch dump, which does carry model information
+(`modelId`, `longName`, `modelFamily` are named by Atlantic's own API), contains
+no `600U…` string anywhere. Against them being serials: nothing but the absence
+of positive evidence. **This is format-and-absence reasoning, which is weak.** A
+sticker on either board, or a second appliance (identical values ⇒ model,
+different ⇒ serial), settles it in one observation; until then both names stay as
+inherited guesses.
+
+Two things *are* settled. `0x0164006501` is **not** a second serial number, which
+is how an earlier version of this document described it. And the appliance serial
+is `0x0164006601` — the only entry in this whole catalogue with corroboration
+from outside the bus, since the rating plate is independent of both the protocol
+and the cloud.
+
+That independence matters, because the cloud muddies rather than confirms. The
+Cozytouch capability dump for this same unit stores capabilities as bare numeric
+IDs with no names: `capabilityId` 88 holds exactly the 12 digits of
+`0x0164006501`, and `capabilityId` 98 holds a 15-digit number that is **not** the
+one on the plate and on the bus. Both 15-digit numbers start `100`; they are
+different numbers. What 98 identifies is unknown — not the gateway, whose
+`serialNumber` in the same dump is a dashed `nnnn-nnnn-nnnn` form in an obviously
+different namespace. Do not treat it as the appliance serial.
+
+A caveat on anything sourced from that dump: the capability IDs are unnamed in
+the API response. Names like "model name" or "product number" for them come from
+the community `gduteil/cozytouch` integration's own mapping table, which is that
+project's reverse engineering exactly as this document is ours. Only the *values*
+are evidence; the labels are not.
 
 ## Control surface
 
@@ -414,24 +498,21 @@ a malformed write is a real risk to the appliance.
 
 A user with hardware can close these:
 
-1. What is MAIN's actual response deadline after an HMI request? **Partly
-   settled, as a margin rather than a deadline.** Across all five committed
-   `real_dual_bus_*.csv` captures (1499 request/answer pairs), the gap between
-   the HMI request's last byte and the start of MAIN's answer — the answer's own
-   transmit time at 38400 8N1 subtracted off — is never below 3.75 ms, with a
-   median of 4.56 ms and a maximum of 6.4 ms. Those were all recorded with the
-   MITM relay already in circuit, so the HMI tolerates at least that much. Two
-   caveats: these are capture-flush timestamps, not wire timestamps, so they
-   carry FIFO and poll-loop jitter; and one appliance recorded them. What this
-   does *not* give is the HMI's first-miss timeout. A sustained link blackout
-   only shows what the HMI does once it has decided MAIN is gone (it retries
-   step one of its initialisation burst roughly every 470 ms — three intervals
-   in `real_single_bus_version_poll.csv`, 468/468/488 ms), which could be much
-   longer than the deadline for a single missed answer. The practical question
-   "is the relay fast enough" is answered anyway: `relay_latency_max_us` is
-   reported in microseconds against a tolerance demonstrably at least 3.75 ms.
-   Measuring the first-miss timeout exactly would need a drop-exactly-N
-   variant of the blackout, which was deliberately not built.
+1. What is MAIN's actual response deadline after an HMI request? **Settled from
+   both ends, on one appliance.** The *floor*: across all five committed idle /
+   activation `real_dual_bus_*.csv` captures (1499 request/answer pairs), the
+   gap between the HMI request's last byte and the start of MAIN's answer — the
+   answer's own transmit time at 38400 8N1 subtracted off — is never below
+   3.75 ms, with a median of 4.56 ms and a maximum of 6.4 ms, all recorded with
+   the MITM relay already in circuit. The *ceiling*:
+   `real_dual_bus_link_blackout.csv` measures the first-miss timeout directly at
+   **~470 ms** (see *Losing and regaining MAIN*), and the penalty for exceeding
+   it is mild — the HMI retries the same request twice more before skipping it,
+   and only re-initialises after a whole round of failures. So the budget a
+   relay has to stay inside is roughly two orders of magnitude above
+   `relay_latency_max_us`, which has been observed at 5.8 ms. Caveats: these are
+   capture-flush timestamps, not wire timestamps, so they carry FIFO and
+   poll-loop jitter; and one appliance recorded all of it.
 2. Does `0x0164158301` change with the anti-legionella setpoint?
 3. Do the six cycle counters map to compressor, fan, defrost, electric element…?
    Candidate labels for cycles 1, 2, 3 and 6 are proposed in *Cycle triplet

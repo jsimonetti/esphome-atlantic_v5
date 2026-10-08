@@ -150,11 +150,14 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
   const uint8_t *p = f.payload();
 
   switch (f.header_key()) {
-    case header::FIRMWARE_VERSION:
-      emit_text_field(f, sink, ctx, ENT_FIRMWARE_VERSION);
+    case header::CONTROLLER_FIRMWARE_VERSION:
+      emit_text_field(f, sink, ctx, ENT_CONTROLLER_FIRMWARE_VERSION);
       break;
-    case header::SERIAL_NUMBER:
-      emit_text_field(f, sink, ctx, ENT_SERIAL_NUMBER);
+    case header::APPLIANCE_SERIAL:
+      emit_text_field(f, sink, ctx, ENT_APPLIANCE_SERIAL);
+      break;
+    case header::PRODUCT_CODE:
+      emit_text_field(f, sink, ctx, ENT_PRODUCT_CODE);
       break;
     case header::POWER_BOARD_VERSION:
       emit_text_field(f, sink, ctx, ENT_POWER_BOARD_VERSION);
@@ -222,8 +225,8 @@ void Decoder::decode(const Frame &f, Sink sink, void *ctx) const {
       emit_bool(sink, ctx, ENT_HEATING_ACTIVE, codec::decode_bool(p + 2));
       break;
     }
-    case header::HMI_VERSION:
-      emit_text_field(f, sink, ctx, ENT_HMI_VERSION);
+    case header::HMI_FIRMWARE_VERSION:
+      emit_text_field(f, sink, ctx, ENT_HMI_FIRMWARE_VERSION);
       break;
     case header::HMI_MODEL:
       emit_text_field(f, sink, ctx, ENT_HMI_MODEL);

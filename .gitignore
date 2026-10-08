@@ -5,6 +5,11 @@ wiki/
 /graft/
 /z_gitignored/
 
+# Raw `esphome logs` recordings. These carry the appliance's serial number and
+# model codes verbatim whenever they catch an initialisation burst; only the
+# anonymised slices under test/captures/ may be committed.
+*.log
+
 # Python / uv
 .venv/
 __pycache__/

@@ -67,7 +67,7 @@ int main() {
     CHECK(l.us_since_main(1'060'000) == 60'000);
   }
 
-  // --- An HMI-origin write frame (hmi_version, header 0165 0003 01, txn 0x65)
+  // --- An HMI-origin write frame (hmi_firmware_version, header 0165 0003 01, txn 0x65)
   // decodes but must never reset the MAIN-quiet gate (HMI going
   // quiet alone does not reset it - the mirror image, HMI staying chatty alone, must
   // likewise never mask MAIN going quiet). ---
@@ -84,7 +84,7 @@ int main() {
     for (uint8_t b : frame)
       l.push_byte(b, 5'000'000);
 
-    CHECK(find(c, atlantic_v5::ENT_HMI_VERSION) != nullptr);
+    CHECK(find(c, atlantic_v5::ENT_HMI_FIRMWARE_VERSION) != nullptr);
     CHECK(l.us_since_main(5'000'000) == 5'000'000);  // unaffected by the HMI frame
   }
 

@@ -58,7 +58,7 @@ int main() {
     CHECK(actual == expected);
   }
 
-  for (const char *name : {"real_dual_bus_idle_polling"}) {
+  for (const char *name : {"real_dual_bus_idle_polling", "real_dual_bus_link_blackout"}) {
     const std::string stem = std::string(CAPTURES_DIR) + "/" + name;
     auto rows = replay::load_capture(stem + ".csv", dual_bus);
     CHECK(!rows.empty());

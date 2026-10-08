@@ -82,6 +82,32 @@ of it: the appliance started heating ~70 s after `eager` was selected and
 correlation does not generalise. The deactivation window is the exception to the
 caveat — nothing was being rewritten by then; the unit stopped on its own.
 
+`real_dual_bus_link_blackout.csv` is 17.15 s of a `mitm` session in which the
+`link_blackout` switch (the diagnostic behind the `ATLANTIC_V5_LINK_BLACKOUT`
+build flag) severed MAIN → HMI forwarding for 15 s. It is the only capture that
+contains an **initialisation burst**, and the only one that shows what the HMI
+does when its answers stop arriving. 194 chunks (97 `hmi`, 97 `main`), zero CRC
+errors, **47 distinct headers** against the 25 every other capture has.
+
+It covers the seven mapped headers that no committed capture had ever
+exercised on real bytes — `controller_firmware_version`, `appliance_serial`,
+`power_board_version`, `controller_model`, `hmi_model`, `hmi_firmware_version` and
+`setpoint` — so between it and the idle captures every mapped header in
+`catalog.h` now has real bytes behind it. It also contains the first sighting of
+`0x0164FDEE01`, which is in neither `catalog.h` nor
+[`docs/protocol.md`](../../docs/protocol.md) and so still counts as an unknown
+header.
+
+Two things set this file apart from the others. First, it is the only `real_*`
+capture whose bytes were **altered**: four text fields carrying a serial or
+model identifier were replaced with same-length placeholders and their CRCs
+recomputed, on seven frames in total; its own `#` header names each one. Version
+strings were left verbatim. Second, because the blackout suppresses *forwarding*
+and the capture records bytes *received*, MAIN's answers are all present in the
+file even though the HMI never saw them — replaying it replays both sides
+verbatim and does not reproduce the blackout, which is what `test_link_blackout`
+covers.
+
 ## Recording your own capture
 
 Set `capture: { bus: true }` on the `atlantic_v5:` hub, flash a devkit tapped

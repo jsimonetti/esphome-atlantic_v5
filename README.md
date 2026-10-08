@@ -46,9 +46,13 @@ explicitly in "Hardware-only acceptance" below.
 
 ```yaml
 external_components:
-  - source: github://jsimonetti/esphome-atlantic_v5@v0.1
+  - source: github://jsimonetti/esphome-atlantic_v5@v0.2
     components: [atlantic_v5]
 ```
+
+The entity names documented below are the ones v0.2 publishes. v0.1 spelled
+four of them differently (`firmware_version`, `serial_number`, `hmi_version`,
+and had no `product_code`), so pinning an older tag will reject this config.
 
 Requires the `esp-idf` framework (not Arduino) — this component owns UART and,
 in MITM mode, GPIO-matrix configuration directly, which needs esp-idf's driver

@@ -4,8 +4,9 @@ namespace atlantic_v5 {
 
 namespace {
 constexpr const char *NAMES[ENT_COUNT] = {
-    "firmware_version",
-    "serial_number",
+    "controller_firmware_version",
+    "appliance_serial",
+    "product_code",
     "power_board_version",
     "controller_model",
     "setpoint",
@@ -42,7 +43,7 @@ constexpr const char *NAMES[ENT_COUNT] = {
     "input_i2",
     "input_i1",
     "heating_active",
-    "hmi_version",
+    "hmi_firmware_version",
     "hmi_model",
     "heating_element_active",
     "valid_frames",

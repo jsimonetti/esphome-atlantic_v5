@@ -239,7 +239,7 @@ int main() {
     CHECK(find(all, atlantic_v5::ENT_CYCLE_1_COUNT)->u == 7u);
 
     // Firmware version text (0164006401): "2.9".
-    CHECK(std::strcmp(find(all, atlantic_v5::ENT_FIRMWARE_VERSION)->text, "2.9") == 0);
+    CHECK(std::strcmp(find(all, atlantic_v5::ENT_CONTROLLER_FIRMWARE_VERSION)->text, "2.9") == 0);
 
     // Payload-less frames not in the mapped catalogue, plus the HMI-origin write
     // and its MAIN ack on 0165FEF901: all four headers are in the *unmapped*
@@ -314,11 +314,11 @@ int main() {
     for (const auto &f : frames)
       decoder.decode(f, collect, &all);
 
-    CHECK(std::strcmp(find(all, atlantic_v5::ENT_SERIAL_NUMBER)->text, "SN1234567890") == 0);
+    CHECK(std::strcmp(find(all, atlantic_v5::ENT_APPLIANCE_SERIAL)->text, "SN1234567890") == 0);
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_POWER_BOARD_VERSION)->text, "1.4") == 0);
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_CONTROLLER_MODEL)->text, "V5-CTRL") == 0);
     CHECK(find(all, atlantic_v5::ENT_SETPOINT)->f == 50.00f);
-    CHECK(std::strcmp(find(all, atlantic_v5::ENT_HMI_VERSION)->text, "3.1") == 0);
+    CHECK(std::strcmp(find(all, atlantic_v5::ENT_HMI_FIRMWARE_VERSION)->text, "3.1") == 0);
     CHECK(std::strcmp(find(all, atlantic_v5::ENT_HMI_MODEL)->text, "HMI-STD") == 0);
 
     // Evaporator 1 min/max (0164FEC303): 4.50 / 6.00.
@@ -354,9 +354,9 @@ int main() {
   // DecodedValue::text is published; anything that would read past the frame,
   // overflow the text buffer, or lack a terminator is rejected. ---
   {
-    // Catalogue width (firmware_version, 17): decodes.
+    // Catalogue width (controller_firmware_version, 17): decodes.
     uint8_t payload[17] = {'2', '.', '9'};
-    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 17);
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::CONTROLLER_FIRMWARE_VERSION, payload, 17);
     atlantic_v5::Decoder decoder;
     Collector c;
     decoder.decode(f, collect, &c);
@@ -367,12 +367,12 @@ int main() {
     // Narrower than the catalogue but still NUL-terminated: same string,
     // published anyway.
     uint8_t payload[4] = {'2', '.', '9', 0x00};
-    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 4);
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::CONTROLLER_FIRMWARE_VERSION, payload, 4);
     atlantic_v5::Decoder decoder;
     Collector c;
     decoder.decode(f, collect, &c);
     CHECK(c.values.size() == 1);
-    CHECK(c.values[0].id == atlantic_v5::ENT_FIRMWARE_VERSION);
+    CHECK(c.values[0].id == atlantic_v5::ENT_CONTROLLER_FIRMWARE_VERSION);
     CHECK(std::strcmp(c.values[0].text, "2.9") == 0);
   }
   {
@@ -419,7 +419,7 @@ int main() {
     // No trailing NUL: structurally invalid whatever the width, never published.
     uint8_t payload[17];
     std::memset(payload, 'A', sizeof(payload));
-    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 17);
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::CONTROLLER_FIRMWARE_VERSION, payload, 17);
     atlantic_v5::Decoder decoder;
     Collector c;
     decoder.decode(f, collect, &c);
@@ -430,7 +430,7 @@ int main() {
     // narrow width never implies the terminator check was skipped.
     uint8_t payload[4];
     std::memset(payload, 'A', sizeof(payload));
-    atlantic_v5::Frame f = make_frame(atlantic_v5::header::FIRMWARE_VERSION, payload, 4);
+    atlantic_v5::Frame f = make_frame(atlantic_v5::header::CONTROLLER_FIRMWARE_VERSION, payload, 4);
     atlantic_v5::Decoder decoder;
     Collector c;
     decoder.decode(f, collect, &c);

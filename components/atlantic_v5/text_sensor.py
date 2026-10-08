@@ -11,11 +11,12 @@ CODEOWNERS = ["@jsimonetti"]
 # key (message catalogue's Entity name, docs/protocol.md) -> EntityId enum member
 # name in catalog.h. All diagnostic: version/model/serial info, not telemetry.
 TEXT_SENSORS = {
-    "firmware_version": "ENT_FIRMWARE_VERSION",
-    "serial_number": "ENT_SERIAL_NUMBER",
+    "controller_firmware_version": "ENT_CONTROLLER_FIRMWARE_VERSION",
+    "appliance_serial": "ENT_APPLIANCE_SERIAL",
+    "product_code": "ENT_PRODUCT_CODE",
     "power_board_version": "ENT_POWER_BOARD_VERSION",
     "controller_model": "ENT_CONTROLLER_MODEL",
-    "hmi_version": "ENT_HMI_VERSION",
+    "hmi_firmware_version": "ENT_HMI_FIRMWARE_VERSION",
     "hmi_model": "ENT_HMI_MODEL",
 }
 
