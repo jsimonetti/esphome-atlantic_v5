@@ -246,7 +246,8 @@ int main() {
     seen.clear();
     Rig rig{config_with(BlackoutDirection::BOTH, 15'000'000)};
     rig.relay.set_frame_sink(
-        [](void *, Channel channel, const Frame &, const uint8_t *, uint32_t) { seen.push_back(channel); }, nullptr);
+        [](void *, Channel channel, const Frame &, const uint8_t *, uint8_t, uint32_t) { seen.push_back(channel); },
+        nullptr);
 
     rig.relay.request_blackout();
     rig.advance(1'000);

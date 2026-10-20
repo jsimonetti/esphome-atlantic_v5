@@ -196,7 +196,7 @@ void AtlanticV5Component::loop_mitm() {
     this->maybe_capture_frame(f);
     // ADR 0002: the input entities report the observed input, so put the
     // pre-rewrite payload back before decoding.
-    if (ev.modified)
+    if (ev.modified && ev.observed_len > 0)
       f.replace_payload(ev.observed_payload);
     this->decoder_.decode(f, &AtlanticV5Component::publish_trampoline, this);
   }

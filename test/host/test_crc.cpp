@@ -166,5 +166,22 @@ int main() {
   // CRC actually changed (payload did), proving recompute ran rather than a stale copy.
   CHECK(std::memcmp(f.raw() + f.raw_len() - 2, original + sizeof(original) - 2, 2) != 0);
 
+  // snapshot_payload: a full 12-byte payload fits and records its length.
+  {
+    atlantic_v5::Frame g(atlantic_v5::Channel::MAIN, original, sizeof(original));
+    uint8_t snap[atlantic_v5::OBSERVED_PAYLOAD_MAX] = {};
+    CHECK(g.snapshot_payload(snap, sizeof(snap)) == 12);
+    CHECK(std::memcmp(snap, original + 6, 12) == 0);
+    // Too small a destination: refused, untouched.
+    uint8_t small[11] = {};
+    CHECK(g.snapshot_payload(small, sizeof(small)) == 0);
+    CHECK(small[0] == 0);
+    // Declares 12 but only 4 bytes were buffered (silence backstop): refused.
+    atlantic_v5::Frame h(atlantic_v5::Channel::MAIN, original, 5 + 1 + 4 + 2);
+    uint8_t none[12] = {};
+    CHECK(h.snapshot_payload(none, sizeof(none)) == 0);
+    CHECK(none[0] == 0);
+  }
+
   TEST_MAIN_RETURN();
 }

@@ -17,6 +17,9 @@ static constexpr uint32_t BAUD = 38400;
 // payload and must not depend on the policy layer.
 static constexpr size_t REWRITE_PAYLOAD_LEN = 3;
 
+// Largest payload the relay snapshots before a rewrite: the 12-byte temperatures payload.
+static constexpr size_t OBSERVED_PAYLOAD_MAX = 12;
+
 // Which party a byte stream or Frame came from. BUS is only meaningful for a
 // single-wire listener capture, where direction isn't separable at the wire.
 enum class Channel : uint8_t { HMI = 0, MAIN = 1, BUS = 2 };
@@ -36,10 +39,11 @@ struct FrameEvent {
   bool modified;
   bool crc_ok;
   uint32_t t_us;  // arrival of the last byte
-  // Payload as received, before the rewrite. Meaningful only when modified;
-  // decoding this rather than data is what makes the input entities report the
-  // observed input (ADR 0002).
-  uint8_t observed_payload[REWRITE_PAYLOAD_LEN];
+  // Payload as received, before the rewrite. Meaningful only when modified and
+  // observed_len > 0; decoding this rather than data is what makes the input
+  // entities report the observed input (ADR 0002).
+  uint8_t observed_payload[OBSERVED_PAYLOAD_MAX];
+  uint8_t observed_len;
 };
 
 enum class ControlMode : uint8_t {

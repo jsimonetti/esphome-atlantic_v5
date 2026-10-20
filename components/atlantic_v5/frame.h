@@ -36,6 +36,10 @@ class Frame {
   // caller guarantees src holds at least that many.
   void replace_payload(const uint8_t *src);
 
+  // Copies the declared payload into dst and returns its length, or 0 (dst
+  // untouched) when it is empty, exceeds cap, or is not fully buffered.
+  uint8_t snapshot_payload(uint8_t *dst, size_t cap) const;
+
   bool modified() const { return modified_; }
   const uint8_t *raw() const { return buf_; }
   uint8_t raw_len() const { return len_; }

@@ -52,7 +52,7 @@ _Avoid_: timeout (that is the MAIN-quiet staleness gate)
 The window after a write to a Side during which bytes arriving back on that same Side are our own transceiver's echo, and are discarded rather than framed. MITM only, and not configurable: `flush_input()` after each write already removes the echo, so this is only a backstop for a byte that lands after that flush.
 
 **Controllable entity**:
-An entity whose ESPHome-side action writes into shared runtime state read by the relay task. Two of them: the `select` control-mode entity, which writes into RelayPolicy, and the `switch` link-blackout entity, which writes into Relay.
+An entity whose ESPHome-side action writes into shared runtime state read by the relay task. Three of them: the `select` control-mode entity and the `number` temperature-override entity, which write into RelayPolicy, and the `switch` link-blackout entity, which writes into Relay.
 _Avoid_: writable entity
 
 **Read-only entity**:
@@ -63,7 +63,7 @@ A Read-only entity derived solely from a header the message catalogue marks cade
 _Avoid_: identity entity, static entity, nameplate value
 
 **RelayPolicy** / **Rewrite**:
-The only code path allowed to alter bus bytes in flight; applies solely to the input-status frame (header `0x0164FF1403`), per the control surface described in [`docs/protocol.md`](docs/protocol.md).
+The only code path allowed to alter bus bytes in flight; applies solely to the input-status frame (header `0x0164FF1403`) and, for the Temperature override, the water-temperature field of the temperatures frame (header `0x0164FEB006`), per the control surface described in [`docs/protocol.md`](docs/protocol.md).
 
 **Link blackout**:
 A deliberate, time-bounded suppression of frame forwarding in one or both directions, used to make the HMI believe it has lost MAIN so that it replays its initialisation burst on reconnection. Distinct from a Rewrite, which alters bytes: a blackout forwards nothing at all. An axis of its own, independent of control mode. MITM only — a passive tap forwards nothing to begin with.
@@ -75,6 +75,10 @@ _Avoid_: input state (ambiguous with effective input)
 
 **Effective input**:
 The I1/I2 values MAIN actually acts on — equal to the observed input under passthrough, and to the Rewrite's substituted values otherwise. Deliberately not an entity: it is already implied by the control-mode entity.
+
+**Temperature override**:
+A user-set water temperature that replaces the water-temperature field MAIN reports in the frame forwarded to the HMI; `0` means no override. The `water_temperature` entity keeps publishing MAIN's observed value, never the override. MITM only.
+_Avoid_: temperature rewrite, fake temperature
 
 **Bus capture** (`capture: { bus: true }`):
 Raw, pre-assembly byte+timestamp logging, used to harvest real `test/captures/*.csv` files from a user's own hardware. Runs upstream of the FrameAssembler; needs no decode logic.

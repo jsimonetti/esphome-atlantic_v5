@@ -60,11 +60,12 @@ void RelayTask::run() {
 }
 
 void RelayTask::frame_sink_trampoline(void *ctx, Channel channel, const Frame &f, const uint8_t *observed_payload,
-                                      uint32_t t_us) {
-  static_cast<RelayTask *>(ctx)->push_event(channel, f, observed_payload, t_us);
+                                      uint8_t observed_len, uint32_t t_us) {
+  static_cast<RelayTask *>(ctx)->push_event(channel, f, observed_payload, observed_len, t_us);
 }
 
-void RelayTask::push_event(Channel channel, const Frame &f, const uint8_t *observed_payload, uint32_t t_us) {
+void RelayTask::push_event(Channel channel, const Frame &f, const uint8_t *observed_payload, uint8_t observed_len,
+                           uint32_t t_us) {
   FrameEvent ev{};
   size_t len = f.raw_len() > sizeof(ev.data) ? sizeof(ev.data) : f.raw_len();
   memcpy(ev.data, f.raw(), len);
@@ -73,8 +74,10 @@ void RelayTask::push_event(Channel channel, const Frame &f, const uint8_t *obser
   ev.modified = f.modified();
   ev.crc_ok = f.crc_valid();
   ev.t_us = t_us;
-  if (observed_payload != nullptr)
-    memcpy(ev.observed_payload, observed_payload, REWRITE_PAYLOAD_LEN);
+  if (observed_payload != nullptr && observed_len <= sizeof(ev.observed_payload)) {
+    memcpy(ev.observed_payload, observed_payload, observed_len);
+    ev.observed_len = observed_len;
+  }
 
   // On failure, count and drop — forwarding has already happened by
   // this point (this runs from Relay's frame sink, called after the write), so a

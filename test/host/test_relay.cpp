@@ -483,7 +483,7 @@ int main() {
       std::vector<uint8_t> bytes;
       size_t writes_so_far;
       bool had_observed;
-      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN];
+      uint8_t observed[atlantic_v5::OBSERVED_PAYLOAD_MAX];
     };
     std::vector<Event> events;
     struct Ctx {
@@ -492,12 +492,13 @@ int main() {
       MockBusIo *main_io;
     } ctx{&events, &hmi_io, &main_io};
     relay.set_frame_sink(
-        [](void *raw_ctx, Channel channel, const Frame &f, const uint8_t *observed, uint32_t /*t_us*/) {
+        [](void *raw_ctx, Channel channel, const Frame &f, const uint8_t *observed, uint8_t observed_len,
+           uint32_t /*t_us*/) {
           auto *c = static_cast<Ctx *>(raw_ctx);
           size_t writes = c->hmi_io->writes_.size() + c->main_io->writes_.size();
           Event ev{channel, std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()), writes, observed != nullptr, {}};
           if (observed != nullptr)
-            std::memcpy(ev.observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+            std::memcpy(ev.observed, observed, observed_len);
           c->events->push_back(ev);
         },
         &ctx);
@@ -554,15 +555,17 @@ int main() {
     struct Sunk {
       std::vector<uint8_t> forwarded;
       bool had_observed = false;
-      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN]{};
+      uint8_t observed[atlantic_v5::OBSERVED_PAYLOAD_MAX]{};
+      uint8_t observed_len = 0;
     } sunk;
     relay.set_frame_sink(
-        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint32_t) {
+        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint8_t observed_len, uint32_t) {
           auto *s = static_cast<Sunk *>(ctx);
           s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
           s->had_observed = observed != nullptr;
+          s->observed_len = observed_len;
           if (observed != nullptr)
-            std::memcpy(s->observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+            std::memcpy(s->observed, observed, observed_len);
         },
         &sunk);
 
@@ -580,6 +583,7 @@ int main() {
     CHECK(sunk.forwarded[7] == 0x01);
     CHECK(sunk.forwarded[8] == 0x01);
     CHECK(sunk.had_observed);
+    CHECK(sunk.observed_len == atlantic_v5::REWRITE_PAYLOAD_LEN);
 
     Frame f(Channel::MAIN, sunk.forwarded.data(), static_cast<uint8_t>(sunk.forwarded.size()));
     f.replace_payload(sunk.observed);
@@ -626,7 +630,7 @@ int main() {
       bool had_observed = false;
     } sunk;
     relay.set_frame_sink(
-        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint32_t) {
+        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint8_t, uint32_t) {
           auto *s = static_cast<Sunk *>(ctx);
           s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
           s->had_observed = observed != nullptr;
