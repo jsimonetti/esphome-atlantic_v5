@@ -207,6 +207,8 @@ void AtlanticV5Component::loop_mitm() {
 
 void AtlanticV5Component::set_control_mode(::atlantic_v5::ControlMode mode) { this->policy_.set_control_mode(mode); }
 
+void AtlanticV5Component::set_temperature_override(int16_t centi_c) { this->policy_.set_temperature_override(centi_c); }
+
 #ifdef ATLANTIC_V5_LINK_BLACKOUT
 void AtlanticV5Component::request_link_blackout(bool engage) {
   // Null in listener mode and before setup_mitm(); switch.py already rejects

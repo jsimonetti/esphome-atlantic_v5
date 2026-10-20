@@ -558,6 +558,18 @@ Hard constraints:
   PV or smart-grid inputs. If it is not, the rewrite is accepted on the bus but
   does nothing.
 
+### Temperature override
+
+Separately from `control_mode`, the water-temperature field (first of the six
+temperatures) of `0x0164FEB006` can be replaced on the way to the HMI by the
+`water_temperature_override` number: 0 to 100 °C in 0.1 steps, `0` = off. The
+same hard constraints apply (exact header, payload length 12, valid CRC, CRC
+recomputed); the other five fields and the min/max frames (`0x0164FEBA03`) are
+never touched. It is independent of `control_mode` (active under every mode,
+including `passthrough`), starts at `0` after every restart, and the
+`water_temperature` entity keeps decoding MAIN's value, never the override.
+MITM only.
+
 **No other writable parameter is known.** Do not attempt to synthesise `0x65`
 write frames for setpoint or mode; the unit's acceptance criteria are unknown and
 a malformed write is a real risk to the appliance.
