@@ -4,17 +4,8 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
 from esphome.components.esp32 import get_esp32_variant
-from esphome.components.esp32.const import (
-    VARIANT_ESP32C2,
-    VARIANT_ESP32C3,
-    VARIANT_ESP32C5,
-    VARIANT_ESP32C6,
-    VARIANT_ESP32C61,
-    VARIANT_ESP32H2,
-    VARIANT_ESP32H4,
-    VARIANT_ESP32H21,
-    VARIANT_ESP32S2,
-)
+from esphome.components.esp32 import const as esp32_const
+from esphome.components.esp32.const import VARIANT_ESP32C3, VARIANT_ESP32S2
 from esphome.const import CONF_ID, CONF_MODE, CONF_RX_PIN, CONF_TIMEOUT, CONF_TX_PIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,16 +58,21 @@ MITM_UNSUPPORTED_VARIANTS = {VARIANT_ESP32C3, VARIANT_ESP32S2}
 # Single-core targets: pinning to a specific core (relay_core)
 # doesn't apply. xTaskCreatePinnedToCore still works with tskNO_AFFINITY, which
 # is what an unset relay_core resolves to on these variants (see to_code).
+# Looked up by name: older ESPHome releases lack the newer variant constants.
 SINGLE_CORE_VARIANTS = {
-    VARIANT_ESP32C2,
-    VARIANT_ESP32C3,
-    VARIANT_ESP32C5,
-    VARIANT_ESP32C6,
-    VARIANT_ESP32C61,
-    VARIANT_ESP32H2,
-    VARIANT_ESP32H4,
-    VARIANT_ESP32H21,
-    VARIANT_ESP32S2,
+    getattr(esp32_const, name)
+    for name in (
+        "VARIANT_ESP32C2",
+        "VARIANT_ESP32C3",
+        "VARIANT_ESP32C5",
+        "VARIANT_ESP32C6",
+        "VARIANT_ESP32C61",
+        "VARIANT_ESP32H2",
+        "VARIANT_ESP32H4",
+        "VARIANT_ESP32H21",
+        "VARIANT_ESP32S2",
+    )
+    if hasattr(esp32_const, name)
 }
 
 # The three bus timing defaults, duplicated from C++ so they show up
