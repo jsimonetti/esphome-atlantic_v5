@@ -178,3 +178,8 @@ select:
   - platform: atlantic_v5
     control_mode:
       name: Operation mode
+
+number:
+  - platform: atlantic_v5
+    water_temperature_override:
+      name: Water temperature override

@@ -483,7 +483,7 @@ int main() {
       std::vector<uint8_t> bytes;
       size_t writes_so_far;
       bool had_observed;
-      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN];
+      uint8_t observed[atlantic_v5::OBSERVED_PAYLOAD_MAX];
     };
     std::vector<Event> events;
     struct Ctx {
@@ -492,12 +492,13 @@ int main() {
       MockBusIo *main_io;
     } ctx{&events, &hmi_io, &main_io};
     relay.set_frame_sink(
-        [](void *raw_ctx, Channel channel, const Frame &f, const uint8_t *observed, uint32_t /*t_us*/) {
+        [](void *raw_ctx, Channel channel, const Frame &f, const uint8_t *observed, uint8_t observed_len,
+           uint32_t /*t_us*/) {
           auto *c = static_cast<Ctx *>(raw_ctx);
           size_t writes = c->hmi_io->writes_.size() + c->main_io->writes_.size();
           Event ev{channel, std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()), writes, observed != nullptr, {}};
           if (observed != nullptr)
-            std::memcpy(ev.observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+            std::memcpy(ev.observed, observed, observed_len);
           c->events->push_back(ev);
         },
         &ctx);
@@ -554,15 +555,17 @@ int main() {
     struct Sunk {
       std::vector<uint8_t> forwarded;
       bool had_observed = false;
-      uint8_t observed[atlantic_v5::REWRITE_PAYLOAD_LEN]{};
+      uint8_t observed[atlantic_v5::OBSERVED_PAYLOAD_MAX]{};
+      uint8_t observed_len = 0;
     } sunk;
     relay.set_frame_sink(
-        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint32_t) {
+        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint8_t observed_len, uint32_t) {
           auto *s = static_cast<Sunk *>(ctx);
           s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
           s->had_observed = observed != nullptr;
+          s->observed_len = observed_len;
           if (observed != nullptr)
-            std::memcpy(s->observed, observed, atlantic_v5::REWRITE_PAYLOAD_LEN);
+            std::memcpy(s->observed, observed, observed_len);
         },
         &sunk);
 
@@ -580,6 +583,7 @@ int main() {
     CHECK(sunk.forwarded[7] == 0x01);
     CHECK(sunk.forwarded[8] == 0x01);
     CHECK(sunk.had_observed);
+    CHECK(sunk.observed_len == atlantic_v5::REWRITE_PAYLOAD_LEN);
 
     Frame f(Channel::MAIN, sunk.forwarded.data(), static_cast<uint8_t>(sunk.forwarded.size()));
     f.replace_payload(sunk.observed);
@@ -626,7 +630,7 @@ int main() {
       bool had_observed = false;
     } sunk;
     relay.set_frame_sink(
-        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint32_t) {
+        [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint8_t, uint32_t) {
           auto *s = static_cast<Sunk *>(ctx);
           s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
           s->had_observed = observed != nullptr;
@@ -664,6 +668,180 @@ int main() {
     CHECK(!policy.apply(f));
     CHECK(!f.modified());
     CHECK(std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()) == raw);
+  }
+
+  // --- Temperature override: only the water field of 0164FEB006 changes, under
+  // every control mode, with a valid CRC; 0 disables. ---
+  {
+    // water 45.67, outlet 60.00, inlet 10.00, evap 1/2/3 = 5.00/6.00/7.00 (0.01 degC, big-endian)
+    const std::vector<uint8_t> payload{0x11, 0xD7, 0x17, 0x70, 0x03, 0xE8, 0x01, 0xF4, 0x02, 0x58, 0x02, 0xBC};
+    auto temps_frame = [&](const std::vector<uint8_t> &pl) {
+      std::vector<uint8_t> fr{0x01, 0x64, 0xFE, 0xB0, 0x06, static_cast<uint8_t>(pl.size())};
+      fr.insert(fr.end(), pl.begin(), pl.end());
+      fr.insert(fr.end(), {0x00, 0x00});
+      append_crc(fr);
+      return fr;
+    };
+    const auto original = temps_frame(payload);
+    auto bytes_of = [](const Frame &f) { return std::vector<uint8_t>(f.raw(), f.raw() + f.raw_len()); };
+
+    CHECK(RelayPolicy{}.temperature_override() == 0);
+
+    // Override off: untouched, not counted as a rewrite.
+    {
+      RelayPolicy policy;
+      Frame f(Channel::MAIN, original.data(), static_cast<uint8_t>(original.size()));
+      CHECK(!policy.apply(f));
+      CHECK(!f.modified());
+      CHECK(bytes_of(f) == original);
+    }
+
+    // Override on, under each control mode: water replaced, other five fields identical, CRC valid.
+    using atlantic_v5::ControlMode;
+    for (ControlMode mode : {ControlMode::PASSTHROUGH, ControlMode::NORMAL, ControlMode::EAGER, ControlMode::OFF,
+                             ControlMode::BOOST}) {
+      RelayPolicy policy;
+      policy.set_control_mode(mode);
+      policy.set_temperature_override(5500);  // 55.00 degC = 0x157C
+      Frame f(Channel::MAIN, original.data(), static_cast<uint8_t>(original.size()));
+      CHECK(policy.apply(f));
+      CHECK(f.crc_valid());
+      CHECK(f.payload()[0] == 0x15);
+      CHECK(f.payload()[1] == 0x7C);
+      CHECK(std::memcmp(f.payload() + 2, payload.data() + 2, 10) == 0);
+      CHECK(policy.control_mode() == mode);
+    }
+
+    // Negative override encodes as two's complement.
+    {
+      RelayPolicy policy;
+      policy.set_temperature_override(-250);  // 0xFF06
+      Frame f(Channel::MAIN, original.data(), static_cast<uint8_t>(original.size()));
+      CHECK(policy.apply(f));
+      CHECK(f.payload()[0] == 0xFF);
+      CHECK(f.payload()[1] == 0x06);
+      CHECK(f.crc_valid());
+    }
+
+    // Declared 12 but carrying fewer (silence backstop), and a wrong declared length: untouched.
+    {
+      RelayPolicy policy;
+      policy.set_temperature_override(5500);
+      std::vector<uint8_t> trunc{0x01, 0x64, 0xFE, 0xB0, 0x06, 0x0C, 0x11, 0xDF, 0x17, 0x70, 0x00, 0x00};
+      append_crc(trunc);
+      Frame f(Channel::MAIN, trunc.data(), static_cast<uint8_t>(trunc.size()));
+      CHECK(f.crc_valid());
+      CHECK(f.buffered_payload_len() < f.payload_len());
+      CHECK(!policy.apply(f));
+      CHECK(bytes_of(f) == trunc);
+
+      const auto short_frame = temps_frame({0x11, 0xDF, 0x17, 0x70});
+      Frame g(Channel::MAIN, short_frame.data(), static_cast<uint8_t>(short_frame.size()));
+      CHECK(!policy.apply(g));
+      CHECK(bytes_of(g) == short_frame);
+    }
+
+    // Switching mode on a live policy does not disturb the override.
+    {
+      RelayPolicy policy;
+      policy.set_temperature_override(5500);
+      for (ControlMode mode : {ControlMode::BOOST, ControlMode::PASSTHROUGH, ControlMode::OFF}) {
+        policy.set_control_mode(mode);
+        CHECK(policy.temperature_override() == 5500);
+        Frame f(Channel::MAIN, original.data(), static_cast<uint8_t>(original.size()));
+        CHECK(policy.apply(f));
+      }
+    }
+
+    // Through the relay: override off forwards the frame verbatim and counts nothing.
+    {
+      MockBusIo hmi_io, main_io;
+      RelayPolicy policy;
+      Relay relay(hmi_io, main_io, policy);
+      main_io.queue(1000, original);
+      main_io.set_now(1000);
+      hmi_io.set_now(1000);
+      relay.poll(1000);
+      CHECK(hmi_io.writes_.size() == 1);
+      CHECK(hmi_io.writes_[0] == original);
+      CHECK(relay.stats().rewrites_applied == 0);
+    }
+
+    // Bad CRC: untouched.
+    {
+      RelayPolicy policy;
+      policy.set_temperature_override(5500);
+      auto bad = original;
+      bad.back() ^= 0xFF;
+      Frame f(Channel::MAIN, bad.data(), static_cast<uint8_t>(bad.size()));
+      CHECK(!policy.apply(f));
+      CHECK(bytes_of(f) == bad);
+    }
+
+    // Water min/max frame is never touched.
+    {
+      RelayPolicy policy;
+      policy.set_temperature_override(5500);
+      std::vector<uint8_t> minmax{0x01, 0x64, 0xFE, 0xBA, 0x03, 0x05, 0x00, 0x0F, 0xA0, 0x13, 0x88, 0x00, 0x00};
+      append_crc(minmax);
+      Frame f(Channel::MAIN, minmax.data(), static_cast<uint8_t>(minmax.size()));
+      CHECK(!policy.apply(f));
+      CHECK(bytes_of(f) == minmax);
+    }
+
+    // End to end: the relay forwards the override and counts it; the decoder, fed
+    // the restored observed payload, still sees MAIN's water temperature.
+    {
+      MockBusIo hmi_io, main_io;
+      RelayPolicy policy;
+      policy.set_temperature_override(5500);
+      Relay relay(hmi_io, main_io, policy);
+
+      struct Sunk {
+        std::vector<uint8_t> forwarded;
+        bool had_observed = false;
+        uint8_t observed[atlantic_v5::OBSERVED_PAYLOAD_MAX]{};
+        uint8_t observed_len = 0;
+      } sunk;
+      relay.set_frame_sink(
+          [](void *ctx, Channel, const Frame &f, const uint8_t *observed, uint8_t observed_len, uint32_t) {
+            auto *s = static_cast<Sunk *>(ctx);
+            s->forwarded.assign(f.raw(), f.raw() + f.raw_len());
+            s->had_observed = observed != nullptr;
+            s->observed_len = observed_len;
+            if (observed != nullptr)
+              std::memcpy(s->observed, observed, observed_len);
+          },
+          &sunk);
+
+      main_io.queue(1000, original);
+      main_io.set_now(1000);
+      hmi_io.set_now(1000);
+      relay.poll(1000);
+
+      CHECK(hmi_io.writes_.size() == 1);
+      CHECK(hmi_io.writes_[0] != original);
+      CHECK(hmi_io.writes_[0][6] == 0x15);
+      CHECK(hmi_io.writes_[0][7] == 0x7C);
+      CHECK(relay.stats().rewrites_applied == 1);
+      CHECK(sunk.had_observed);
+      CHECK(sunk.observed_len == 12);
+
+      Frame f(Channel::MAIN, sunk.forwarded.data(), static_cast<uint8_t>(sunk.forwarded.size()));
+      f.replace_payload(sunk.observed);
+      CHECK(f.crc_valid());
+
+      float water = 0.0f;
+      atlantic_v5::Decoder decoder;
+      decoder.decode(
+          f,
+          [](void *ctx, const atlantic_v5::DecodedValue &v) {
+            if (v.id == atlantic_v5::ENT_WATER_TEMPERATURE)
+              *static_cast<float *>(ctx) = v.f;
+          },
+          &water);
+      CHECK(water == 45.67f);
+    }
   }
 
   TEST_MAIN_RETURN();

@@ -76,7 +76,8 @@ atlantic_v5:
 ```
 
 `tx_pin` is rejected in this mode and `tx_enable_pin` is unused — the component
-never drives the bus in `listener`. A `select: control_mode` entity is rejected
+never drives the bus in `listener`. A `select: control_mode` or
+`number: water_temperature_override` entity is rejected
 at compile time too (see "Control (MITM only)" below); there's nothing to
 rewrite without a second UART sitting in the middle.
 
@@ -394,6 +395,23 @@ told those two inputs are doing:
   effect — the unit simply ignores contacts it was never told to look at.
   There is no known way to query that configuration state from the bus, so
   this component cannot detect or warn about it.
+
+### Water temperature override: `number: water_temperature_override`
+
+```yaml
+number:
+  - platform: atlantic_v5
+    water_temperature_override:
+      name: Water temperature override
+```
+
+Replaces the water temperature the HMI displays (the first field of the
+temperatures frame `0164FEB006`); the other five temperatures are forwarded
+byte-identical. Range 0 to 100 °C, step 0.1; **`0` = off** (MAIN's value passes
+through). It is independent of `control_mode`: it applies under every option,
+including `passthrough`. It starts at `0` after every restart and is never
+restored. The `water_temperature` sensor always shows MAIN's real value, never
+the override. Like `control_mode`, it is rejected in `mode: listener`.
 
 ## Link blackout (MITM only): `switch: link_blackout`
 

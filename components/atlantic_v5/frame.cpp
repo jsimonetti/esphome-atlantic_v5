@@ -59,4 +59,12 @@ void Frame::replace_payload(const uint8_t *src) {
   modified_ = true;
 }
 
+uint8_t Frame::snapshot_payload(uint8_t *dst, size_t cap) const {
+  uint8_t n = payload_len();
+  if (len_ < 2 || n == 0 || n > cap || buffered_payload_len() < n)
+    return 0;
+  std::memcpy(dst, payload(), n);
+  return n;
+}
+
 }  // namespace atlantic_v5

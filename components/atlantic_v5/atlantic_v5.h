@@ -74,6 +74,9 @@ class AtlanticV5Component : public Component {
   // mode - unreachable anyway, since select.py rejects control_mode there.
   void set_control_mode(::atlantic_v5::ControlMode mode);
 
+  // The water_temperature_override number's write path (0.01 degC, 0 = off).
+  void set_temperature_override(int16_t centi_c);
+
 #ifdef ATLANTIC_V5_LINK_BLACKOUT
   // The link_blackout switch's write path. Compiled in only when switch.py put
   // the entity in the config, so a build without it has no way to sever the

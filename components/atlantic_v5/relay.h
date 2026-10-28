@@ -66,9 +66,10 @@ class Relay {
   // forwarding, which has already happened by the time this runs. f reflects any
   // rewrite RelayPolicy::apply already applied, i.e. the bytes that went out on
   // the wire. observed_payload is the payload as received, non-null only when a
-  // rewrite was applied; decode that rather than f's payload (ADR 0002).
+  // rewrite was applied (and observed_len is then > 0); decode that rather than
+  // f's payload (ADR 0002).
   using FrameSink = void (*)(void *ctx, Channel channel, const Frame &f, const uint8_t *observed_payload,
-                             uint32_t t_us);
+                             uint8_t observed_len, uint32_t t_us);
   void set_frame_sink(FrameSink sink, void *ctx) {
     frame_sink_ = sink;
     frame_ctx_ = ctx;

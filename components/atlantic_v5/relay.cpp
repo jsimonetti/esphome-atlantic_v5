@@ -1,7 +1,5 @@
 #include "relay.h"
 
-#include <cstring>
-
 #include "frame.h"
 
 namespace atlantic_v5 {
@@ -101,16 +99,15 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
     // evidence a blackout exists to collect. Nothing is rewritten, nothing
     // reaches the wire, and frames_relayed is not touched.
     if (frame_sink_ != nullptr)
-      frame_sink_(frame_ctx_, in_channel, f, nullptr, now_us);
+      frame_sink_(frame_ctx_, in_channel, f, nullptr, 0, now_us);
     return;
   }
 #endif
 
   // Snapshot the payload before the rewrite: the wire gets the rewritten frame,
   // the decoder gets what the appliance actually reported (ADR 0002).
-  uint8_t observed[REWRITE_PAYLOAD_LEN] = {};
-  if (f.payload_len() == REWRITE_PAYLOAD_LEN && f.buffered_payload_len() >= REWRITE_PAYLOAD_LEN)
-    std::memcpy(observed, f.payload(), REWRITE_PAYLOAD_LEN);
+  uint8_t observed[OBSERVED_PAYLOAD_MAX] = {};
+  uint8_t observed_len = f.snapshot_payload(observed, sizeof(observed));
 
   // apply() is itself a no-op on a bad-CRC or non-matching frame, so a frame that
   // only got this far because forward_bad_crc is set still goes out exactly as
@@ -129,7 +126,7 @@ void Relay::forward(Side &in, Side &out, Channel in_channel, uint32_t now_us) {
     stats_.rewrites_applied++;
 
   if (frame_sink_ != nullptr)
-    frame_sink_(frame_ctx_, in_channel, f, rewritten ? observed : nullptr, now_us);
+    frame_sink_(frame_ctx_, in_channel, f, rewritten ? observed : nullptr, rewritten ? observed_len : 0, now_us);
 
   // Latency here is last-byte-in (now_us, the timestamp the completed frame was
   // detected at) to write-complete, so on real hardware it includes the frame's
