@@ -83,3 +83,7 @@ _Avoid_: raw frame dump, capture log
 **Frame capture** (`capture: { mapped|unmapped|unknown: true }`):
 Post-assembly, post-CRC-check hex logging of already-framed frames to the ESPHome log, for live debugging. Gated per catalogue category, each category under its own `atlantic_v5.capture.<category>` tag. Publishes no entity. Distinct from bus capture, which is pre-assembly and produces test fixtures, not debug output.
 _Avoid_: frame log, raw frame log
+
+**Temperature publish step**:
+The fixed 0.1 °C step at which every temperature entity publishes. A temperature is published only once it differs from the last published value by at least one step, and is published rounded to the step grid. Finer movement on the bus (0.01 °C) is not published.
+_Avoid_: resolution, granularity

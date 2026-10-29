@@ -33,6 +33,12 @@ PY_ENTRY_RE = re.compile(r'"([a-z0-9_]+)"\s*:\s*\(?\s*"(ENT_[A-Z0-9_]+)"')
 
 PLATFORM_FILES = ("sensor.py", "binary_sensor.py", "text_sensor.py")
 
+# is_temperature()'s inclusive enum range, and the SENSORS entries built with _temp_schema.
+IS_TEMPERATURE_RE = re.compile(
+    r"is_temperature\(uint16_t id\) \{\s*return id >= (ENT_[A-Z0-9_]+) && id <= (ENT_[A-Z0-9_]+);"
+)
+TEMP_SCHEMA_ENTRY_RE = re.compile(r'"[a-z0-9_]+"\s*:\s*\(\s*"(ENT_[A-Z0-9_]+)"\s*,\s*_temp_schema\(')
+
 failures: list[str] = []
 
 
@@ -94,6 +100,24 @@ def main() -> int:
             ent_id in exposed,
             f"{ent_id} exists in EntityId but no platform .py exposes it — "
             f"nothing can ever publish it",
+        )
+
+    # The hub quantises by is_temperature() while the display decimals come from
+    # _temp_schema; the two must name the same entities.
+    range_match = IS_TEMPERATURE_RE.search(catalog_h.read_text())
+    if range_match is None:
+        print(f"FATAL: could not find is_temperature() in {catalog_h}", file=sys.stderr)
+        return 2
+    first, last = (index_of.get(name) for name in range_match.groups())
+    if first is None or last is None:
+        failures.append(f"is_temperature() bounds {range_match.groups()} are not members of EntityId")
+    else:
+        quantised = set(ids[first : last + 1])
+        schema_temps = set(TEMP_SCHEMA_ENTRY_RE.findall((COMPONENT_DIR / "sensor.py").read_text()))
+        check(
+            quantised == schema_temps,
+            f"is_temperature() range and sensor.py _temp_schema entries differ: "
+            f"only in catalogue {sorted(quantised - schema_temps)}, only in sensor.py {sorted(schema_temps - quantised)}",
         )
 
     for failure in failures:

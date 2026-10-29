@@ -1,4 +1,5 @@
 #include "atlantic_v5.h"
+#include "temp_step.h"
 #include "esphome/core/log.h"
 
 #include <cinttypes>
@@ -415,9 +416,14 @@ void AtlanticV5Component::publish_to_entity(const ::atlantic_v5::DecodedValue &v
       // sensor::Sensor::publish_state() doesn't dedupe by value on its own
       // (unlike binary_sensor/text_sensor); do it here so the API stays quiet
       // at the bus's ~1 Hz frame rate, unless force_update overrides it.
-      bool unchanged = this->has_last_published_[v.id] && this->last_published_[v.id] == f;
-      if (unchanged && !s->get_force_update())
+      const bool is_temp = ::atlantic_v5::is_temperature(v.id);
+      const bool quiet = is_temp ? !::atlantic_v5::temp_should_publish(this->has_last_published_[v.id],
+                                                                         this->last_published_[v.id], f)
+                                 : (this->has_last_published_[v.id] && this->last_published_[v.id] == f);
+      if (quiet && !s->get_force_update())
         return;
+      if (is_temp)
+        f = ::atlantic_v5::quantise_temp(f);
       s->publish_state(f);
       this->last_published_[v.id] = f;
       this->has_last_published_[v.id] = true;

@@ -82,6 +82,11 @@ target_link_libraries(test_init_values PRIVATE atlantic_v5_core)
 target_include_directories(test_init_values PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME test_init_values COMMAND test_init_values)
 
+add_executable(test_temp_step test_temp_step.cpp)
+target_link_libraries(test_temp_step PRIVATE atlantic_v5_core)
+target_include_directories(test_temp_step PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME test_temp_step COMMAND test_temp_step)
+
 add_executable(replay replay.cpp)
 target_link_libraries(replay PRIVATE replay_lib)
 
