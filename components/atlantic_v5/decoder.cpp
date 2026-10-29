@@ -44,9 +44,9 @@ bool decode_minmax(const uint8_t *b, float *min_c, float *max_c) {
 }
 
 Cycle decode_cycle(const uint8_t *b) {
-  uint32_t secs1 = decode_u32(b + 4);
+  uint32_t secs0 = decode_u32(b);
   uint32_t count = decode_u32(b + 8);
-  return Cycle{secs1 > 0, count};
+  return Cycle{secs0 > 0, count};
 }
 
 }  // namespace codec

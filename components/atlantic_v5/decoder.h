@@ -45,7 +45,7 @@ bool decode_text(const uint8_t *b, uint8_t len, char *out, size_t out_len);
 bool decode_minmax(const uint8_t *b, float *min_c, float *max_c);
 
 // Three uint32 BE: secs_in_state0, secs_in_state1, cycle_count. active is
-// secs_in_state1 > 0.
+// secs_in_state0 > 0 (state 0 is the running state).
 struct Cycle {
   bool active;
   uint32_t count;

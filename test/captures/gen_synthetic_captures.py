@@ -117,7 +117,7 @@ def build_dual_bus_capture() -> list[Row]:
     # Cycle 1.
     rows.append(Row(1_150_000, "hmi", payload_less_frame(bytes.fromhex("0164FEE203"))))
     rows.append(Row(1_156_000, "main", payload_frame(
-        bytes.fromhex("0164FEE203"), u32(0) + u32(125) + u32(7),
+        bytes.fromhex("0164FEE203"), u32(125) + u32(0) + u32(7),
     )))
 
     # Firmware version text.
@@ -169,7 +169,7 @@ def build_single_bus_capture() -> list[Row]:
 
     rows.append(Row(2_350_000, "bus", payload_less_frame(bytes.fromhex("0164FEE503"))))
     rows.append(Row(2_357_000, "bus", payload_frame(
-        bytes.fromhex("0164FEE503"), u32(42) + u32(0) + u32(3),
+        bytes.fromhex("0164FEE503"), u32(0) + u32(42) + u32(3),
     )))
 
     # Deliberately corrupted frame: valid CRC computed, then one payload bit flipped
