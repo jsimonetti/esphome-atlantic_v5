@@ -186,13 +186,13 @@ int main() {
     CHECK(untouched_min == -1 && untouched_max == -1);
   }
   {
-    // secs_in_state1 > 0 -> active, count is field 3 verbatim.
-    const uint8_t active[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7D, 0x00, 0x00, 0x00, 0x07};
+    // secs_in_state0 > 0 -> active, count is field 3 verbatim.
+    const uint8_t active[] = {0x00, 0x00, 0x00, 0x7D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07};
     auto c1 = atlantic_v5::codec::decode_cycle(active);
     CHECK(c1.active == true);
     CHECK(c1.count == 7u);
-    // secs_in_state1 == 0 -> inactive.
-    const uint8_t inactive[] = {0x00, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03};
+    // secs_in_state0 == 0 -> inactive.
+    const uint8_t inactive[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x03};
     auto c2 = atlantic_v5::codec::decode_cycle(inactive);
     CHECK(c2.active == false);
     CHECK(c2.count == 3u);
@@ -234,7 +234,7 @@ int main() {
     CHECK(find(all, atlantic_v5::ENT_INPUT_I1)->b == true);
     CHECK(find(all, atlantic_v5::ENT_HEATING_ACTIVE)->b == true);
 
-    // Cycle 1 (0164FEE203): secs0=0 secs1=125 count=7 -> active, count 7.
+    // Cycle 1 (0164FEE203): secs0=125 secs1=0 count=7 -> active, count 7.
     CHECK(find(all, atlantic_v5::ENT_CYCLE_1_ACTIVE)->b == true);
     CHECK(find(all, atlantic_v5::ENT_CYCLE_1_COUNT)->u == 7u);
 
@@ -326,7 +326,7 @@ int main() {
     CHECK(find(all, atlantic_v5::ENT_EVAPORATOR_1_TEMPERATURE_MIN)->f == 4.50f);
     CHECK(find(all, atlantic_v5::ENT_EVAPORATOR_1_TEMPERATURE_MAX)->f == 6.00f);
 
-    // Cycle 2 (0164FEE503): secs0=42 secs1=0 count=3 -> inactive, count 3.
+    // Cycle 2 (0164FEE503): secs0=0 secs1=42 count=3 -> inactive, count 3.
     CHECK(find(all, atlantic_v5::ENT_CYCLE_2_ACTIVE)->b == false);
     CHECK(find(all, atlantic_v5::ENT_CYCLE_2_COUNT)->u == 3u);
 
@@ -498,26 +498,26 @@ int main() {
     CHECK(c.values[1].f == 9.75f);
 
     // cycle: secs_in_state0, secs_in_state1, count (three uint32 BE).
-    // active == (secs_in_state1 > 0), so 3 and 5 are active, 4 and 6 are not.
-    const uint8_t cycle3[] = {0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 101};
+    // active == (secs_in_state0 > 0), so 3 and 5 are active, 4 and 6 are not.
+    const uint8_t cycle3[] = {0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 101};
     check_pair(atlantic_v5::header::CYCLE_3, cycle3, 12, atlantic_v5::ENT_CYCLE_3_ACTIVE,
                atlantic_v5::ENT_CYCLE_3_COUNT, &c);
     CHECK(c.values[0].b == true);
     CHECK(c.values[1].u == 101u);
 
-    const uint8_t cycle4[] = {0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 102};
+    const uint8_t cycle4[] = {0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 102};
     check_pair(atlantic_v5::header::CYCLE_4, cycle4, 12, atlantic_v5::ENT_CYCLE_4_ACTIVE,
                atlantic_v5::ENT_CYCLE_4_COUNT, &c);
     CHECK(c.values[0].b == false);
     CHECK(c.values[1].u == 102u);
 
-    const uint8_t cycle5[] = {0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 103};
+    const uint8_t cycle5[] = {0, 0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 103};
     check_pair(atlantic_v5::header::CYCLE_5, cycle5, 12, atlantic_v5::ENT_CYCLE_5_ACTIVE,
                atlantic_v5::ENT_CYCLE_5_COUNT, &c);
     CHECK(c.values[0].b == true);
     CHECK(c.values[1].u == 103u);
 
-    const uint8_t cycle6[] = {0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 0, 104};
+    const uint8_t cycle6[] = {0, 0, 0, 0, 0, 0, 0, 44, 0, 0, 0, 104};
     check_pair(atlantic_v5::header::CYCLE_6, cycle6, 12, atlantic_v5::ENT_CYCLE_6_ACTIVE,
                atlantic_v5::ENT_CYCLE_6_COUNT, &c);
     CHECK(c.values[0].b == false);

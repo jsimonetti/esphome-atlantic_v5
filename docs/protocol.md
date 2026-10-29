@@ -175,25 +175,23 @@ ambiguity is visible rather than silently treated as certainty.
 | `cycle` | three uint32 BE: `secs_in_state0`, `secs_in_state1`, `cycle_count` | see below |
 
 **Cycle triplet semantics.** Each of the six cycle frames tracks a two-state
-process. In state 0, field 1 counts seconds and field 2 is zero. In state 1,
-field 2 counts seconds and field 1 is zero. On the transition from state 1 back
-to state 0, field 3 increments. Therefore `active = (secs_in_state1 > 0)` and
+process. In state 0 (running), field 1 counts seconds and field 2 is zero. In
+state 1 (idle), field 2 counts seconds and field 1 is zero. On entering state 0,
+field 3 increments. Therefore `active = (secs_in_state0 > 0)` and
 `count = field3`.
 
-**The `active` polarity looks inverted. Not yet changed in the decoder.**
-The rule above was written from `real_single_bus_idle_polling.csv`, an idle
-machine on which all six frames reported field 1 = 0 and field 2 ticking up in
-lock-step while `0x0164FF1403` reported `heating active = 0` — which labels an
-idle machine six-for-six active. The 2026-10-02 sessions point the other way:
-in both of them every cycle that moved left state 1 and began counting state 0
-at the moment something started running, and field 3 incremented on *entering*
-state 0. If that reading is right, state 0 is the running state and
-`active = (secs_in_state0 > 0)`, with `count = field3` unchanged.
+The decoder first implemented the opposite polarity (`secs_in_state1 > 0`),
+which labelled an idle machine six-for-six active: in
+`real_single_bus_idle_polling.csv` all six frames report field 1 = 0 and
+field 2 ticking up while `0x0164FF1403` reported `heating active = 0`. The
+2026-10-02 sessions show every cycle leaving state 1 and beginning to count
+state 0 at the moment something started running, with field 3 incrementing on
+entering state 0.
 
 That is two sessions on one appliance, and no firmware documentation. It is the
 best-supported reading, not a confirmed one — what makes it more than a guess is
 that the state changes line up with independently metered power steps rather
-than only with other bus traffic. The decoder still implements the old rule.
+than only with other bus traffic.
 
 **What each cycle may count.** Hypotheses from the run spans in the 09:24–09:52
 session, which is covered by the four `real_dual_bus_*` captures other than
@@ -600,9 +598,9 @@ A user with hardware can close these:
    `0x0165FEF901` tracks the compressor's apparent run span and `0x0165FF0101`
    brackets both transients. What `0x0165FEFB01` and `0x0165FF0301` add over
    those two, and why `0x0165FEFB01` alone spans the post-run, is still open.
-7. Is the cycle `active` polarity inverted? Two sessions say yes — see *Cycle
-   triplet semantics* — but the decoder has not been changed and the reading has
-   only ever been checked against this one appliance.
+7. Is state 0 really the running state of every cycle? Two sessions say yes —
+   see *Cycle triplet semantics* — but the reading has only ever been checked
+   against this one appliance.
 8. Is the element's power level fixed? `0x0165FEF701` and `0x0165FEF901` both
    carry `64` = 100, which reads like a percentage, but no capture has shown
    either at any other non-zero value. A unit with a modulating element or
