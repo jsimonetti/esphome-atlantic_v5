@@ -508,7 +508,7 @@ sensor:
 ```
 
 With $T_w$ = `water_temperature`, $T_{setmax}$ = `setpoint_max`, $V_{tank}$ =
-`tank_volume` and $T_c$ the cold water temperature (fixed at 15 °C):
+`tank_volume` and $T_c$ the cold water temperature (15 °C unless set, below):
 
 $$V_{40} = \begin{cases} 0 & T_w \le 40 \\ V_{tank} \cdot \frac{T_w - T_c}{40 - T_c} & T_w > 40 \end{cases}$$
 
@@ -522,6 +522,16 @@ $$\text{hot water available} = 100 \cdot \frac{V_{40}}{V_{40,cap}}\ \%$$
 - `hot_water_available` is not capped at 100 %: after an anti-legionella cycle
   (70 °C) the same tank reads about 117 %. It is never below 0 %.
 - `tank_volume` is required if any of the three sensors is configured.
+- An optional `number` sets $T_c$ (0–30 °C, step 0.1) from Home Assistant; the
+  three sensors recompute immediately. It starts at 15 °C on every boot and is
+  not retained. It only affects this calculation, never the relay, and works in
+  both modes:
+
+  ```yaml
+  number:
+    - platform: atlantic_v5
+      cold_water_temperature: { name: Cold water temperature }
+  ```
 - `v40_water_available` is unknown until `water_temperature` has been seen;
   `v40_water_capacity` and `hot_water_available` need `setpoint_max` too (which
   is [retained across a restart](#init-cadence-values-across-a-restart)).

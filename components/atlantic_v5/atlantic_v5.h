@@ -60,6 +60,13 @@ class AtlanticV5Component : public Component {
   // Litres; feeds the V40 sensors, which publish nothing while it is unset (0).
   void set_tank_volume(uint32_t litres) { tank_volume_l_ = static_cast<float>(litres); }
 
+  // The cold_water_temperature number's write path: recomputes the V40 sensors now.
+  float cold_water_temperature() const { return cold_water_c_; }
+  void set_cold_water_temperature(float celsius) {
+    cold_water_c_ = celsius;
+    update_v40();
+  }
+
   // MITM-mode side wiring. tx_enable_pin -1 means no DIR pin;
   // one_wire_mirror selects the shared-pin transceiver. Called once per side from
   // to_code.
@@ -198,6 +205,7 @@ class AtlanticV5Component : public Component {
   ::atlantic_v5::InitValueStore init_values_;
   // V40 inputs; NAN until observed.
   float tank_volume_l_{0};
+  float cold_water_c_{::atlantic_v5::DEFAULT_COLD_WATER_C};
   float water_temperature_c_{NAN};
   float setpoint_max_c_{NAN};
   void *entities_[::atlantic_v5::ENT_COUNT]{};

@@ -455,7 +455,7 @@ void AtlanticV5Component::publish_to_entity(const ::atlantic_v5::DecodedValue &v
 void AtlanticV5Component::update_v40() {
   if (this->tank_volume_l_ <= 0)
     return;
-  const float cold = ::atlantic_v5::DEFAULT_COLD_WATER_C;
+  const float cold = this->cold_water_c_;
   const float available = ::atlantic_v5::v40_available(this->tank_volume_l_, cold, this->water_temperature_c_);
   const float capacity = ::atlantic_v5::v40_capacity(this->tank_volume_l_, cold, this->setpoint_max_c_);
   const float values[] = {available, capacity, ::atlantic_v5::hot_water_percent(available, capacity)};

@@ -141,6 +141,11 @@ sensor:
     task_stack_free:
       name: Relay task stack free
 
+number:
+  - platform: atlantic_v5
+    cold_water_temperature:
+      name: Cold water temperature
+
 binary_sensor:
   - platform: atlantic_v5
     connected:
