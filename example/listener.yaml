@@ -28,6 +28,9 @@ atlantic_v5:
     unmapped: false
     unknown: false
   timeout: 60s
+  # Tank volume in litres, from the appliance's rating plate. Required by the
+  # v40_* / hot_water_available sensors below.
+  tank_volume: 200
   hmi:
     uart_num: 1
     rx_pin: GPIO7
@@ -50,6 +53,12 @@ sensor:
       name: Setpoint min
     setpoint_max:
       name: Setpoint max
+    v40_water_available:
+      name: V40 water available
+    v40_water_capacity:
+      name: V40 water capacity
+    hot_water_available:
+      name: Hot water available
     water_temperature_min:
       name: Water temperature min
     water_temperature_max:

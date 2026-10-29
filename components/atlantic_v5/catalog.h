@@ -60,6 +60,11 @@ enum EntityId : uint16_t {
   // Assumed, not established - see header::ASSUMED.
   ENT_HMI_MODEL,
   ENT_HEATING_ELEMENT_ACTIVE,
+  // Derived, not wire traffic: computed from water_temperature, setpoint_max
+  // and the user-supplied tank volume (v40.h).
+  ENT_V40_WATER_AVAILABLE,
+  ENT_V40_WATER_CAPACITY,
+  ENT_HOT_WATER_AVAILABLE,
 
   // Diagnostics, off by default. The three framing counters come in two
   // flavours and exactly one flavour is live per mode: the unsuffixed ones in

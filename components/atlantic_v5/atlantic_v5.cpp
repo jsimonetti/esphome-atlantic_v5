@@ -396,6 +396,11 @@ void AtlanticV5Component::publish(const ::atlantic_v5::DecodedValue &v) {
 }
 
 void AtlanticV5Component::publish_to_entity(const ::atlantic_v5::DecodedValue &v) {
+  if (v.kind == ::atlantic_v5::DecodedValue::Kind::FLOAT &&
+      (v.id == ::atlantic_v5::ENT_WATER_TEMPERATURE || v.id == ::atlantic_v5::ENT_SETPOINT_MAX)) {
+    (v.id == ::atlantic_v5::ENT_WATER_TEMPERATURE ? this->water_temperature_c_ : this->setpoint_max_c_) = v.f;
+    this->update_v40();
+  }
   if (v.id >= ::atlantic_v5::ENT_COUNT)
     return;
   void *obj = this->entities_[v.id];
@@ -417,9 +422,12 @@ void AtlanticV5Component::publish_to_entity(const ::atlantic_v5::DecodedValue &v
       // (unlike binary_sensor/text_sensor); do it here so the API stays quiet
       // at the bus's ~1 Hz frame rate, unless force_update overrides it.
       const bool is_temp = ::atlantic_v5::is_temperature(v.id);
+      const bool same_as_last =
+          this->has_last_published_[v.id] &&
+          (this->last_published_[v.id] == f || (std::isnan(this->last_published_[v.id]) && std::isnan(f)));
       const bool quiet = is_temp ? !::atlantic_v5::temp_should_publish(this->has_last_published_[v.id],
                                                                          this->last_published_[v.id], f)
-                                 : (this->has_last_published_[v.id] && this->last_published_[v.id] == f);
+                                 : same_as_last;
       if (quiet && !s->get_force_update())
         return;
       if (is_temp)
@@ -441,6 +449,24 @@ void AtlanticV5Component::publish_to_entity(const ::atlantic_v5::DecodedValue &v
       static_cast<text_sensor::TextSensor *>(obj)->publish_state(v.text);
       break;
     }
+  }
+}
+
+void AtlanticV5Component::update_v40() {
+  if (this->tank_volume_l_ <= 0)
+    return;
+  const float cold = ::atlantic_v5::DEFAULT_COLD_WATER_C;
+  const float available = ::atlantic_v5::v40_available(this->tank_volume_l_, cold, this->water_temperature_c_);
+  const float capacity = ::atlantic_v5::v40_capacity(this->tank_volume_l_, cold, this->setpoint_max_c_);
+  const float values[] = {available, capacity, ::atlantic_v5::hot_water_percent(available, capacity)};
+  const uint16_t ids[] = {::atlantic_v5::ENT_V40_WATER_AVAILABLE, ::atlantic_v5::ENT_V40_WATER_CAPACITY,
+                          ::atlantic_v5::ENT_HOT_WATER_AVAILABLE};
+  for (size_t i = 0; i < 3; i++) {
+    ::atlantic_v5::DecodedValue d{};
+    d.kind = ::atlantic_v5::DecodedValue::Kind::FLOAT;
+    d.id = ids[i];
+    d.f = values[i];
+    this->publish_to_entity(d);
   }
 }
 
@@ -467,6 +493,9 @@ void AtlanticV5Component::update_staleness(uint32_t now_us) {
   }
 
   this->status_set_warning("no data from MAIN");
+  // The live reading is gone; without this the next setpoint_max decode would
+  // recompute the available volume from a water temperature that is no longer current.
+  this->water_temperature_c_ = NAN;
   for (uint16_t id = 0; id < ::atlantic_v5::ENT_COUNT; id++) {
     if (this->entities_[id] == nullptr || this->kinds_[id] != EntityKind::SENSOR)
       continue;
@@ -475,6 +504,9 @@ void AtlanticV5Component::update_staleness(uint32_t now_us) {
     // setpoint bounds unknown, any more than it does its serial number - which
     // is a text_sensor and was never blanked here to begin with.
     if (::atlantic_v5::init_cadence_index(id) != ::atlantic_v5::INIT_CADENCE_COUNT)
+      continue;
+    // Same for the capacity: its inputs are setpoint_max and a YAML value.
+    if (id == ::atlantic_v5::ENT_V40_WATER_CAPACITY)
       continue;
     static_cast<sensor::Sensor *>(this->entities_[id])->publish_state(NAN);
     this->has_last_published_[id] = false;
