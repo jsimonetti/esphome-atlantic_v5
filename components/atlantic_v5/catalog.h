@@ -90,6 +90,12 @@ enum EntityId : uint16_t {
 // "unknown" for anything outside [0, ENT_COUNT).
 const char *entity_name(EntityId id);
 
+// The contiguous setpoint_min .. evaporator_3_temperature_max block; guarded
+// by test_temp_step against an entity being inserted into it.
+constexpr bool is_temperature(uint16_t id) {
+  return id >= ENT_SETPOINT_MIN && id <= ENT_EVAPORATOR_3_TEMPERATURE_MAX;
+}
+
 // The init-cadence entities (CONTEXT.md): the ones whose only source is the
 // HMI's initialisation burst, stated once and never repeated. Seven identity
 // strings plus the two setpoint bounds. Listed in enum order, which is the
