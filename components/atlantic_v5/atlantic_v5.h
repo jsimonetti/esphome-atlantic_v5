@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
@@ -14,6 +15,8 @@
 #include "listener.h"
 #include "relay.h"
 #include "relay_policy.h"
+#include "retained_payload.h"
+#include "v40.h"
 
 #ifdef USE_ESP32
 #include <driver/uart.h>
@@ -54,6 +57,13 @@ class AtlanticV5Component : public Component {
   // Bus timing knobs. frame_silence is the framing backstop used
   // by every assembler in both modes.
   void set_frame_silence(uint32_t us) { frame_silence_us_ = us; }
+
+  // Litres; feeds the V40 sensors, which publish nothing while it is unset (0).
+  void set_tank_volume(uint32_t litres) { tank_volume_l_ = static_cast<float>(litres); }
+
+  // The cold_water_temperature number's write path: recomputes the V40 sensors now.
+  float cold_water_temperature() const { return cold_water_c_; }
+  void set_cold_water_temperature(float celsius);
 
   // MITM-mode side wiring. tx_enable_pin -1 means no DIR pin;
   // one_wire_mirror selects the shared-pin transceiver. Called once per side from
@@ -104,6 +114,8 @@ class AtlanticV5Component : public Component {
   void publish(const ::atlantic_v5::DecodedValue &v);
   // publish() minus the init-value bookkeeping: hands v straight to its entity.
   void publish_to_entity(const ::atlantic_v5::DecodedValue &v);
+  // Recomputes and publishes the three V40 sensors from the latest inputs.
+  void update_v40();
   void update_staleness(uint32_t now_us);
   uint32_t us_since_main(uint32_t now_us) const;
   // Whether a payload-bearing MAIN frame has been seen at all since boot. Until
@@ -134,11 +146,12 @@ class AtlanticV5Component : public Component {
   void maybe_capture_frame(const ::atlantic_v5::Frame &f);
   static void frame_capture_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
 
-  // Init-cadence values across a software restart (ADR 0003). restore_ reads
-  // the retained block once at setup and republishes whatever it held;
-  // persist_ writes the store back whenever a live decode changed it.
+  // Retained state across a software restart (ADR 0003). restore_ reads the
+  // retained block once at setup and republishes whatever it held;
+  // persist_ writes the init-cadence store and the cold water temperature back
+  // whenever either changed.
   void restore_init_values();
-  void persist_init_values();
+  void persist_retained();
   static void restore_trampoline(void *ctx, const ::atlantic_v5::DecodedValue &v);
 
   // Per-side MITM config; unused in listener mode.
@@ -189,6 +202,13 @@ class AtlanticV5Component : public Component {
   // The nine init-cadence values as last seen, and the dedupe that keeps a
   // restored value from being republished by the observation that confirms it.
   ::atlantic_v5::InitValueStore init_values_;
+  // V40 inputs; NAN until observed.
+  float tank_volume_l_{0};
+  float cold_water_c_{::atlantic_v5::DEFAULT_COLD_WATER_C};
+  // True once the user has set it; only then is it worth retaining.
+  bool cold_water_set_{false};
+  float water_temperature_c_{NAN};
+  float setpoint_max_c_{NAN};
   void *entities_[::atlantic_v5::ENT_COUNT]{};
   EntityKind kinds_[::atlantic_v5::ENT_COUNT]{};
   // Last published numeric value per entity, for the "only publish when

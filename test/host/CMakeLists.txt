@@ -22,7 +22,9 @@ add_library(atlantic_v5_core
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/decoder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/relay_policy.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/retention.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/init_values.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/init_values.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/retained_payload.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5/v40.cpp)
 target_include_directories(atlantic_v5_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/atlantic_v5)
 
@@ -86,6 +88,16 @@ add_executable(test_temp_step test_temp_step.cpp)
 target_link_libraries(test_temp_step PRIVATE atlantic_v5_core)
 target_include_directories(test_temp_step PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 add_test(NAME test_temp_step COMMAND test_temp_step)
+
+add_executable(test_retained_payload test_retained_payload.cpp)
+target_link_libraries(test_retained_payload PRIVATE atlantic_v5_core)
+target_include_directories(test_retained_payload PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME test_retained_payload COMMAND test_retained_payload)
+
+add_executable(test_v40 test_v40.cpp)
+target_link_libraries(test_v40 PRIVATE atlantic_v5_core)
+target_include_directories(test_v40 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_test(NAME test_v40 COMMAND test_v40)
 
 add_executable(replay replay.cpp)
 target_link_libraries(replay PRIVATE replay_lib)

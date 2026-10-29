@@ -491,6 +491,57 @@ publishes nothing, so `force_update` has no effect on `setpoint_min` /
   `listener` there is no such feedback at all, and the values stay as they
   were until the appliance next initialises.
 
+## V40 and hot water available
+
+Three optional sensors estimate how much usable hot water the tank holds. The
+tank is treated as uniformly at the measured temperature.
+
+```yaml
+atlantic_v5:
+  tank_volume: 200 # litres, from the rating plate
+
+sensor:
+  - platform: atlantic_v5
+    v40_water_available: { name: V40 water available }
+    v40_water_capacity: { name: V40 water capacity }
+    hot_water_available: { name: Hot water available }
+```
+
+With $T_w$ = `water_temperature`, $T_{setmax}$ = `setpoint_max`, $V_{tank}$ =
+`tank_volume` and $T_c$ the cold water temperature (15 °C unless set, below):
+
+$$V_{40} = \begin{cases} 0 & T_w \le 40 \\ V_{tank} \cdot \frac{T_w - T_c}{40 - T_c} & T_w > 40 \end{cases}$$
+
+$$V_{40,cap} = V_{tank} \cdot \frac{T_{setmax} - T_c}{40 - T_c}$$
+
+$$\text{hot water available} = 100 \cdot \frac{V_{40}}{V_{40,cap}}\ \%$$
+
+- Reference check: 200 L, 15 °C cold water and a `setpoint_max` of 62 °C give
+  a capacity of 376 L, which matches the Cozytouch cloud's `v40_water_capacity`
+  for this appliance.
+- `hot_water_available` is not capped at 100 %: after an anti-legionella cycle
+  (70 °C) the same tank reads about 117 %. It is never below 0 %.
+- `tank_volume` is required if any of the three sensors is configured.
+- An optional `number` sets $T_c$ (0–30 °C, step 0.1) from Home Assistant; the
+  three sensors recompute immediately. It starts at 15 °C and keeps the value
+  you set across a software restart (`esphome upload`, a crash), in the same
+  volatile RAM block as the init-cadence values; after a power cycle it is back
+  at 15 °C. Nothing is written to flash. It only affects this calculation,
+  never the relay, and works in both modes:
+
+  ```yaml
+  number:
+    - platform: atlantic_v5
+      cold_water_temperature: { name: Cold water temperature }
+  ```
+- `v40_water_available` is unknown until `water_temperature` has been seen;
+  `v40_water_capacity` and `hot_water_available` need `setpoint_max` too (which
+  is [retained across a restart](#init-cadence-values-across-a-restart)).
+- When MAIN goes quiet, `v40_water_available` and `hot_water_available` go
+  unknown like the other live sensors; `v40_water_capacity` does not, since
+  none of its inputs is a live reading.
+- Works the same in `listener` and `mitm` mode and never touches the relay.
+
 ## Diagnostics
 
 All of the following are off by default (nothing is registered unless you add

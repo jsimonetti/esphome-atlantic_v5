@@ -48,6 +48,7 @@ CONF_FORWARD_BAD_CRC = "forward_bad_crc"
 CONF_FRAME_SILENCE = "frame_silence"
 CONF_DIR_SETUP = "dir_setup"
 CONF_DIR_HOLD = "dir_hold"
+CONF_TANK_VOLUME = "tank_volume"
 # Referenced by the read-only-entity platform files (sensor.py etc.) to look up
 # this hub instance.
 CONF_ATLANTIC_V5_ID = "atlantic_v5_id"
@@ -193,6 +194,9 @@ CONFIG_SCHEMA = cv.All(
             # distinguishable from an explicit False so mode: listener can
             # reject it rather than silently ignore it.
             cv.Optional(CONF_FORWARD_BAD_CRC): cv.boolean,
+            # Litres. No default: the appliance's volume is not on the bus, and
+            # the V40 sensors that need it are rejected without it.
+            cv.Optional(CONF_TANK_VOLUME): cv.int_range(min=1),
             # frame_silence must be non-zero: at zero the backstop
             # fires on every tick and no frame ever assembles.
             cv.Optional(CONF_FRAME_SILENCE, default=f"{DEFAULT_FRAME_SILENCE_US}us"): cv.All(
@@ -219,6 +223,8 @@ async def to_code(config):
     )
     cg.add(var.set_timeout(config[CONF_TIMEOUT]))
     cg.add(var.set_frame_silence(config[CONF_FRAME_SILENCE]))
+    if CONF_TANK_VOLUME in config:
+        cg.add(var.set_tank_volume(config[CONF_TANK_VOLUME]))
 
     if config[CONF_MODE] == MODE_MITM:
         for key, setter in ((CONF_HMI, var.set_hmi_uart), (CONF_MAIN, var.set_main_uart)):

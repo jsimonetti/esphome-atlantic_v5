@@ -9,11 +9,14 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
     UNIT_BYTES,
     UNIT_CELSIUS,
+    UNIT_LITRE,
+    UNIT_PERCENT,
 )
 
 from . import (
     CONF_ATLANTIC_V5_ID,
     CONF_MODE,
+    CONF_TANK_VOLUME,
     MODE_MITM,
     AtlanticV5Component,
     EntityKind,
@@ -37,6 +40,10 @@ def _temp_schema(diagnostic=False):
 
 def _count_schema():
     return sensor.sensor_schema(accuracy_decimals=0, entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
+
+
+def _v40_schema(unit):
+    return sensor.sensor_schema(unit_of_measurement=unit, accuracy_decimals=0, state_class=STATE_CLASS_MEASUREMENT)
 
 
 def _debug_schema(unit):
@@ -83,6 +90,10 @@ SENSORS = {
     "cycle_4_count": ("ENT_CYCLE_4_COUNT", _count_schema()),
     "cycle_5_count": ("ENT_CYCLE_5_COUNT", _count_schema()),
     "cycle_6_count": ("ENT_CYCLE_6_COUNT", _count_schema()),
+    # Derived from water_temperature, setpoint_max and the hub's tank_volume.
+    "v40_water_available": ("ENT_V40_WATER_AVAILABLE", _v40_schema(UNIT_LITRE)),
+    "v40_water_capacity": ("ENT_V40_WATER_CAPACITY", _v40_schema(UNIT_LITRE)),
+    "hot_water_available": ("ENT_HOT_WATER_AVAILABLE", _v40_schema(UNIT_PERCENT)),
     # Framing diagnostics, off by default. One assembler per wire, so the set
     # that means anything depends on the mode: listener taps a single wire and
     # uses the unsuffixed keys, mitm sits between two and publishes each side
@@ -123,11 +134,18 @@ _REJECTED_IN_MITM = {base: f"{base}_hmi / {base}_main" for base in _FRAMING_COUN
 _REJECTED_IN_LISTENER = {f"{base}_{side}": base for base in _FRAMING_COUNTERS for side in ("hmi", "main")}
 assert not (_REJECTED_IN_MITM.keys() | _REJECTED_IN_LISTENER.keys()) - SENSORS.keys()
 
+_NEEDS_TANK_VOLUME = ("v40_water_available", "v40_water_capacity", "hot_water_available")
+assert not set(_NEEDS_TANK_VOLUME) - SENSORS.keys()
+
 
 def _final_validate(config):
     fconf = final_validate.full_config.get()
     hub_path = fconf.get_path_for_id(config[CONF_ATLANTIC_V5_ID])[:-1]
-    mode = fconf.get_config_for_path(hub_path)[CONF_MODE]
+    hub_config = fconf.get_config_for_path(hub_path)
+    mode = hub_config[CONF_MODE]
+    for key in _NEEDS_TANK_VOLUME:
+        if key in config and CONF_TANK_VOLUME not in hub_config:
+            raise cv.Invalid(f"{key} requires 'tank_volume' on the atlantic_v5 hub", path=[key])
     rejected = _REJECTED_IN_MITM if mode == MODE_MITM else _REJECTED_IN_LISTENER
     for key, replacement in rejected.items():
         if key in config:

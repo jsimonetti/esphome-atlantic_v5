@@ -59,7 +59,7 @@ _Avoid_: writable entity
 An entity that only ever receives `publish_state()` from the hub and never writes back into runtime state (sensor, binary_sensor, text_sensor).
 
 **Init-cadence entity**:
-A Read-only entity derived solely from a header the message catalogue marks cadence `init` — stated once during the HMI's initialisation burst and never repeated. The seven identity strings and the two setpoint bounds; [ADR 0003](docs/adr/0003-init-cadence-values-retained-in-volatile-ram.md) covers why they alone are carried across a software restart.
+A Read-only entity derived solely from a header the message catalogue marks cadence `init` — stated once during the HMI's initialisation burst and never repeated. The seven identity strings and the two setpoint bounds; [ADR 0003](docs/adr/0003-init-cadence-values-retained-in-volatile-ram.md) covers why they are carried across a software restart, and why never across a power cycle.
 _Avoid_: identity entity, static entity, nameplate value
 
 **RelayPolicy** / **Rewrite**:
@@ -75,6 +75,26 @@ _Avoid_: input state (ambiguous with effective input)
 
 **Effective input**:
 The I1/I2 values MAIN actually acts on — equal to the observed input under passthrough, and to the Rewrite's substituted values otherwise. Deliberately not an entity: it is already implied by the control-mode entity.
+
+**Cold water temperature**:
+The temperature of the mains water entering the tank, supplied by the user. Not on the bus.
+_Avoid_: inlet temperature, inlet water temperature (the bus's "air inlet" is the heat pump's air intake)
+
+**V40**:
+The volume of 40 °C water obtainable by mixing tank water with cold water, treating the tank as uniformly at the measured water temperature. Zero when the tank is at or below 40 °C.
+_Avoid_: hot water volume, remaining water
+
+**V40 capacity**:
+The V40 of a tank at `setpoint_max`. Fixed by tank volume, `setpoint_max` and cold water temperature, not by the current water temperature.
+_Avoid_: maximum V40
+
+**Hot water available**:
+V40 as a percentage of V40 capacity. Exceeds 100 % when the tank is above `setpoint_max`, as during an anti-legionella cycle; never below 0 %.
+_Avoid_: state of charge, hot water level
+
+**User-supplied parameter**:
+An entity whose value the user sets and the hub only uses in its own calculations — it never reaches the relay task, so it is not a Controllable entity. One so far: cold water temperature.
+_Avoid_: setting, config entity
 
 **Bus capture** (`capture: { bus: true }`):
 Raw, pre-assembly byte+timestamp logging, used to harvest real `test/captures/*.csv` files from a user's own hardware. Runs upstream of the FrameAssembler; needs no decode logic.
