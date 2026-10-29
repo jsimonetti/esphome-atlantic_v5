@@ -345,22 +345,38 @@ void AtlanticV5Component::restore_init_values() {
   // what that observation does and does not establish.
   if (!::atlantic_v5::retained_block().load(buf, sizeof(buf), len))
     return;
-  if (!this->init_values_.decode(buf, len)) {
-    ESP_LOGW(TAG, "retained init values discarded: payload is not a valid encoding");
+  bool has_cold = false;
+  float cold = 0;
+  if (!::atlantic_v5::RetainedPayload::decode(buf, len, this->init_values_, has_cold, cold)) {
+    ESP_LOGW(TAG, "retained values discarded: payload is not a valid encoding");
     return;
   }
+  if (has_cold) {
+    this->cold_water_c_ = cold;
+    this->cold_water_set_ = true;
+  }
   this->init_values_.each(&AtlanticV5Component::restore_trampoline, this);
-  ESP_LOGI(TAG, "restored init-cadence values from the previous run");
+  ESP_LOGI(TAG, "restored retained values from the previous run");
 }
 
-void AtlanticV5Component::persist_init_values() {
-  uint8_t buf[::atlantic_v5::InitValueStore::MAX_ENCODED];
-  const uint16_t len = this->init_values_.encode(buf, sizeof(buf));
+void AtlanticV5Component::persist_retained() {
+  uint8_t buf[::atlantic_v5::RetainedPayload::MAX_ENCODED];
+  const uint16_t len = ::atlantic_v5::RetainedPayload::encode(
+      this->init_values_, this->cold_water_set_ ? &this->cold_water_c_ : nullptr, buf, sizeof(buf));
   if (len == 0)
     return;
   ::atlantic_v5::retained_block().store(buf, len);
 }
 #endif
+
+void AtlanticV5Component::set_cold_water_temperature(float celsius) {
+  this->cold_water_c_ = celsius;
+  this->cold_water_set_ = true;
+#ifdef USE_ESP32
+  this->persist_retained();
+#endif
+  this->update_v40();
+}
 
 void AtlanticV5Component::set_entity(uint16_t id, void *obj, EntityKind kind) {
   if (id >= ::atlantic_v5::ENT_COUNT)
@@ -386,7 +402,7 @@ void AtlanticV5Component::publish(const ::atlantic_v5::DecodedValue &v) {
       return;
     case ::atlantic_v5::InitValueStore::Observation::CHANGED:
 #ifdef USE_ESP32
-      this->persist_init_values();
+      this->persist_retained();
 #endif
       break;
     case ::atlantic_v5::InitValueStore::Observation::NOT_INIT_CADENCE:

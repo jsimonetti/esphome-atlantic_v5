@@ -20,6 +20,8 @@ namespace atlantic_v5_component {
 class AtlanticV5Number : public Component, public number::Number, public Parented<AtlanticV5Component> {
  public:
   void setup() override;
+  // After the hub, which restores the retained value in its own setup().
+  float get_setup_priority() const override { return setup_priority::LATE - 1.0f; }
 
  protected:
   void control(float value) override;

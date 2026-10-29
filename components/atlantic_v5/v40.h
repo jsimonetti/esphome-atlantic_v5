@@ -7,6 +7,8 @@
 namespace atlantic_v5 {
 
 constexpr float DEFAULT_COLD_WATER_C = 15.0f;
+constexpr float COLD_WATER_MIN_C = 0.0f;
+constexpr float COLD_WATER_MAX_C = 30.0f;
 
 // Litres of 40 C water the tank holds: 0 at or below 40 C, else
 // tank_l * (water_c - cold_c) / (40 - cold_c). NaN if cold_c >= 40.

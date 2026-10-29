@@ -523,9 +523,11 @@ $$\text{hot water available} = 100 \cdot \frac{V_{40}}{V_{40,cap}}\ \%$$
   (70 °C) the same tank reads about 117 %. It is never below 0 %.
 - `tank_volume` is required if any of the three sensors is configured.
 - An optional `number` sets $T_c$ (0–30 °C, step 0.1) from Home Assistant; the
-  three sensors recompute immediately. It starts at 15 °C on every boot and is
-  not retained. It only affects this calculation, never the relay, and works in
-  both modes:
+  three sensors recompute immediately. It starts at 15 °C and keeps the value
+  you set across a software restart (`esphome upload`, a crash), in the same
+  volatile RAM block as the init-cadence values; after a power cycle it is back
+  at 15 °C. Nothing is written to flash. It only affects this calculation,
+  never the relay, and works in both modes:
 
   ```yaml
   number:

@@ -15,6 +15,7 @@
 #include "listener.h"
 #include "relay.h"
 #include "relay_policy.h"
+#include "retained_payload.h"
 #include "v40.h"
 
 #ifdef USE_ESP32
@@ -62,10 +63,7 @@ class AtlanticV5Component : public Component {
 
   // The cold_water_temperature number's write path: recomputes the V40 sensors now.
   float cold_water_temperature() const { return cold_water_c_; }
-  void set_cold_water_temperature(float celsius) {
-    cold_water_c_ = celsius;
-    update_v40();
-  }
+  void set_cold_water_temperature(float celsius);
 
   // MITM-mode side wiring. tx_enable_pin -1 means no DIR pin;
   // one_wire_mirror selects the shared-pin transceiver. Called once per side from
@@ -148,11 +146,12 @@ class AtlanticV5Component : public Component {
   void maybe_capture_frame(const ::atlantic_v5::Frame &f);
   static void frame_capture_trampoline(void *ctx, const ::atlantic_v5::Frame &f, uint32_t t_us);
 
-  // Init-cadence values across a software restart (ADR 0003). restore_ reads
-  // the retained block once at setup and republishes whatever it held;
-  // persist_ writes the store back whenever a live decode changed it.
+  // Retained state across a software restart (ADR 0003). restore_ reads the
+  // retained block once at setup and republishes whatever it held;
+  // persist_ writes the init-cadence store and the cold water temperature back
+  // whenever either changed.
   void restore_init_values();
-  void persist_init_values();
+  void persist_retained();
   static void restore_trampoline(void *ctx, const ::atlantic_v5::DecodedValue &v);
 
   // Per-side MITM config; unused in listener mode.
@@ -206,6 +205,8 @@ class AtlanticV5Component : public Component {
   // V40 inputs; NAN until observed.
   float tank_volume_l_{0};
   float cold_water_c_{::atlantic_v5::DEFAULT_COLD_WATER_C};
+  // True once the user has set it; only then is it worth retaining.
+  bool cold_water_set_{false};
   float water_temperature_c_{NAN};
   float setpoint_max_c_{NAN};
   void *entities_[::atlantic_v5::ENT_COUNT]{};
