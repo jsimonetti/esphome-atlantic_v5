@@ -1,12 +1,13 @@
 name: CI
 
+# push is limited to main: a push to a PR branch would otherwise fire both
+# push and pull_request, running every job twice. PR branches are covered by
+# pull_request alone.
 on:
   push:
+    branches: [main]
   pull_request:
 
-# A push to a branch that also has an open PR fires both events. Keying the
-# group on the branch name (rather than github.ref, which differs between the
-# two) makes them collapse into one run instead of two full ESP-IDF builds.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
